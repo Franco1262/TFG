@@ -33,5 +33,8 @@
 #define I2C_SDA                     (15)
 #define I2C_SCL                     (7)
 
+#define MODEM_RX 4
+#define MODEM_TX 5
+
 
 #endif

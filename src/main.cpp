@@ -9,6 +9,7 @@
 XPowersPMU   PMU;
 
 File file;
+HardwareSerial sim7080(1);
 
 //Struct to store data read from the sensor.
 struct DataSensor
@@ -24,34 +25,33 @@ struct DataSensor
 
 void printSDFile(const char* path) 
 {
-  if (!SD_MMC.begin()) {
-    Serial.println("Error inicializando SD");
-    return;
-  }
+    if (!SD_MMC.begin()) {
+        Serial.println("Error inicializando SD");
+        return;
+    }
 
-  File file = SD_MMC.open(path, FILE_READ);
-  if (!file) {
-    Serial.println("No se pudo abrir el archivo");
-    return;
-  }
+    File file = SD_MMC.open(path, FILE_READ);
+    if (!file) {
+        Serial.println("No se pudo abrir el archivo");
+        return;
+    }
 
-  Serial.printf("Contenido de %s:\n", path);
+    Serial.printf("Contenido de %s:\n", path);
 
-  // Leer línea por línea
-  while (file.available()) {
-    String line = file.readStringUntil('\n');
-    Serial.println(line);
-  }
+    // Leer línea por línea
+    while (file.available()) {
+        String line = file.readStringUntil('\n');
+        Serial.println(line);
+    }
 
-  file.close();
-  Serial.println("--- Fin del archivo ---");
+    file.close();
+    Serial.println("--- Fin del archivo ---");
 }
-
 
 void setup() 
 {
     Serial.begin(115200);
-    delay(5000);
+    delay(100);
     if (!PMU.begin(Wire, AXP2101_SLAVE_ADDRESS, I2C_SDA, I2C_SCL))
     {
         while (1)
@@ -78,13 +78,6 @@ void setup()
             delay(1000);
     }
 
-    //printSDFile("/sensor_data.jsonl");
-    file = SD_MMC.open("/sensor_data.jsonl", FILE_APPEND);
-    if (!file) 
-    {
-        Serial.println("Error abriendo archivo");
-        return;
-    }
     pinMode(RS485_DIR1, OUTPUT);
     delay(5000);
 }
@@ -123,9 +116,17 @@ void readSensor()
     decodeData(response);
 }
 
+
 void writeIntoSDCard()
 {
     static uint8_t fileLinesCounter = 0;
+    file = SD_MMC.open("/sensor_data.jsonl", FILE_APPEND);
+    if (!file) 
+    {
+        Serial.println("Error abriendo archivo");
+        return;
+    }
+
     String jsonLine = "{";
     jsonLine += "\"temperature\":" + String(dataReadSensor.temperature) + ",";
     jsonLine += "\"humidity\":" + String(dataReadSensor.humidity) + ",";
@@ -137,12 +138,7 @@ void writeIntoSDCard()
     jsonLine += "}\n";
 
     file.print(jsonLine);
-    fileLinesCounter++;
-    if(fileLinesCounter == 10)
-    {
-        file.flush();
-        fileLinesCounter = 0;
-    }
+    file.close();
 }
 
 void loop() 
