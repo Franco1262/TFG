@@ -10,6 +10,7 @@ XPowersPMU   PMU;
 
 File file;
 HardwareSerial sim7080(1);
+RTC_DATA_ATTR uint8_t writes_counter = 0;
 
 //Struct to store data read from the sensor.
 struct DataSensor
@@ -139,11 +140,24 @@ void writeIntoSDCard()
 
     file.print(jsonLine);
     file.close();
+
+    writes_counter++;
+}
+
+void sendData()
+{
+    
 }
 
 void loop() 
 {
     readSensor();
     writeIntoSDCard();
+    if(writes_counter == 10)
+    {
+        //Logic to send lora packets
+        sendData();
+        writes_counter == 0;
+    }
     delay(2000);
 }
