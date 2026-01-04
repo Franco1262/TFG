@@ -1,38 +1,74 @@
 #include "Modem.h"
 
-String Modem::obtenerCampoGNSS(String respuesta, int numeroCampo) 
+
+int Modem::getGnssField(const char* response, int n_field, char* result, int result_size)
 {
-    int primerSalto = respuesta.indexOf('\n');
-    int inicioSegundaLinea = primerSalto + 1;
-    int segundoSalto = respuesta.indexOf('\n', inicioSegundaLinea);
-    String segundaLinea = respuesta.substring(inicioSegundaLinea, segundoSalto);
-    
-    int coma = 0;
-    int anterior = 0;
-    
-    for (int i = 0; i < numeroCampo && anterior < segundaLinea.length(); i++) {
-        anterior = segundaLinea.indexOf(',', anterior) + 1;
+    const char* prefix = "+CGNSINF: ";
+    const char* data = strstr(response, prefix);
+    if(data) data += strlen(prefix);
+    else return 0;
+
+    for(int i = 0; i < n_field; i++)
+    {
+        data = strchr(data, ',');
+        if(!data) return 0;
+        data++;
     }
-    
-    int siguiente = segundaLinea.indexOf(',', anterior);
-    if (siguiente == -1) siguiente = segundaLinea.length();
-    
-    return segundaLinea.substring(anterior, siguiente);
+
+    const char* end = strchr(data, ',');
+    if(!end) end = strchr(data, '\r');
+
+    if(end)
+    {
+        uint8_t len = end - data;
+        uint8_t copy_size = (len >= result_size) ? (result_size - 1) : len;
+        strncpy(result, data, copy_size);
+        result[copy_size] = '\0';
+
+        return (int)copy_size;
+    }
+
+    return 0;
 }
 
 
-String Modem::sendATandRead(const char* cmd, unsigned long timeoutMs) 
+bool Modem::sendAtAndRead(const char* cmd, char* buffer, int buffer_size, unsigned long timeout_ms) 
 {
     while (Serial1.available()) Serial1.read();
     Serial1.print(cmd);
     Serial1.print("\r\n");
-    String s;
+
+    char dummy_buffer[32]; 
+    char* target_buf = (buffer != nullptr) ? buffer : dummy_buffer;
+    int target_size = (buffer != nullptr) ? buffer_size : sizeof(dummy_buffer);
+    
+    int index = 0;
     unsigned long t = millis();
-    while (millis() - t < timeoutMs) 
+    while (millis() - t < timeout_ms) 
     {
-        while (Serial1.available()) s += (char)Serial1.read();
-        if (s.indexOf("OK") >= 0 || s.indexOf("ERROR") >= 0) break;
-        delay(5);
+        while(Serial1.available())
+        {
+            char c = Serial1.read();
+
+            if(index < (target_size - 1))
+            {
+                target_buf[index++] = c;
+                target_buf[index] = '\0';
+            }
+
+            else if (buffer == nullptr) 
+            {
+                for(int i = 0; i < target_size - 2; i++) target_buf[i] = target_buf[i+1];
+                target_buf[target_size - 2] = c;
+                target_buf[target_size - 1] = '\0';
+            }
+        }
+
+        if (strstr(target_buf, "OK") || strstr(target_buf, "ERROR")) 
+            return true;
+
+        yield();
     }
-    return s;
+
+    return false;
 }

@@ -19,7 +19,8 @@ bool Sensor::read(Data& data)
     while((k < 19) && ((millis() - start) < SENSOR_READ_TIMEOUT)) 
     {
         if(Serial2.available())
-            response[k++] = Serial2.read();      
+            response[k++] = Serial2.read();
+        yield(); 
     }
 
     if(k < 19)
