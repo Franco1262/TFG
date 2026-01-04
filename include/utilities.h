@@ -35,6 +35,19 @@
 
 #define MODEM_RX 4
 #define MODEM_TX 5
+#define MODEM_PWR 41
 
+struct Data 
+{
+    uint32_t timestamp;
+    float temperature;
+    float humidity;
+    int16_t conductivity;
+    int16_t ph;
+    int16_t nitrogen;
+    int16_t phosphorus;
+    int16_t potassium;
+    uint8_t battery;
+};
 
 #endif
