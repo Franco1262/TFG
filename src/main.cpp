@@ -71,8 +71,8 @@ void setup()
             }
         }
         else
-            ;
             //Lora::sendSingle(data);
+            ;
     }
 
     Power::enterDeepSleep();

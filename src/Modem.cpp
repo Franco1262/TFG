@@ -32,43 +32,70 @@ int Modem::getGnssField(const char* response, int n_field, char* result, int res
 }
 
 
-bool Modem::sendAtAndRead(const char* cmd, char* buffer, int buffer_size, unsigned long timeout_ms) 
+bool Modem::sendAtAndRead(const char* cmd,
+                          char* buffer,
+                          int buffer_size,
+                          unsigned long timeout_ms)
 {
-    while (Serial1.available()) Serial1.read();
+    if (!buffer || buffer_size <= 0)
+        return false;
+
+    while (Serial1.available())
+        Serial1.read();
+
+    memset(buffer, 0, buffer_size);
+
     Serial1.print(cmd);
     Serial1.print("\r\n");
 
-    char dummy_buffer[32]; 
-    char* target_buf = (buffer != nullptr) ? buffer : dummy_buffer;
-    int target_size = (buffer != nullptr) ? buffer_size : sizeof(dummy_buffer);
-    
     int index = 0;
-    unsigned long t = millis();
-    while (millis() - t < timeout_ms) 
+    unsigned long start = millis();
+    unsigned long last_rx = millis();
+
+    while ((millis() - start) < timeout_ms)
     {
-        while(Serial1.available())
+        while (Serial1.available())
         {
             char c = Serial1.read();
+            last_rx = millis();
 
-            if(index < (target_size - 1))
+            if (index < buffer_size - 1)
             {
-                target_buf[index++] = c;
-                target_buf[index] = '\0';
-            }
-
-            else if (buffer == nullptr) 
-            {
-                for(int i = 0; i < target_size - 2; i++) target_buf[i] = target_buf[i+1];
-                target_buf[target_size - 2] = c;
-                target_buf[target_size - 1] = '\0';
+                buffer[index++] = c;
+                buffer[index] = '\0';
             }
         }
 
-        if (strstr(target_buf, "OK") || strstr(target_buf, "ERROR")) 
-            return true;
+        if (strstr(buffer, "\r\nOK\r\n") ||
+            strstr(buffer, "\r\nERROR\r\n"))
+        {
+            break;
+        }
 
         yield();
     }
+
+    while ((millis() - last_rx) < 50)
+    {
+        while (Serial1.available())
+        {
+            char c = Serial1.read();
+            last_rx = millis();
+
+            if (index < buffer_size - 1)
+            {
+                buffer[index++] = c;
+                buffer[index] = '\0';
+            }
+        }
+        yield();
+    }
+
+    if (strstr(buffer, "\r\nOK\r\n"))
+        return true;
+
+    if (strstr(buffer, "\r\nERROR\r\n"))
+        return false;
 
     return false;
 }

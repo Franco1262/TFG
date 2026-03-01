@@ -1,11 +1,11 @@
 {
 	"folders": [
 		{
-			"path": ".."
+			"path": "."
 		},
 		{
-			"name": "TFG",
-			"path": "."
+			"name": "tests",
+			"path": "../../../Documentos/PlatformIO/Projects/tests"
 		}
 	],
     "settings": {}

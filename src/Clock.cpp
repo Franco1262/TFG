@@ -1,7 +1,7 @@
 #include "Clock.h"
 
 #define SECONDS_DAY 86400
-#define POLL_INTERVAL 2000
+#define POLL_INTERVAL 10000
 #define FIX_TIMEOUT 600000
 RTC_DATA_ATTR static time_t last_sync_timestamp = 0;
 
@@ -23,6 +23,7 @@ time_t Clock::getGpsTime()
         if(millis() - last_poll >= POLL_INTERVAL)
         {
             last_poll = millis();
+            memset(buffer, 0, sizeof(buffer));
             if(Modem::sendAtAndRead("AT+CGNSINF", buffer, sizeof(buffer), 2000))
             {
                 Serial.println(buffer);

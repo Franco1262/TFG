@@ -36,31 +36,63 @@ int Power::getBattPercent()
 
 void Power::enableModemAndGps()
 {
+    char buffer[256];
+
+    // --- Alimentación PMU ---
     PMU.setDC3Voltage(3000);
     PMU.enableDC3();
 
     PMU.setBLDO2Voltage(3300);
     PMU.enableBLDO2();
 
+    delay(500);
+
+    // --- Encender módem ---
     pinMode(MODEM_PWR, OUTPUT);
+    digitalWrite(MODEM_PWR, LOW);
     delay(100);
+    digitalWrite(MODEM_PWR, HIGH);
+    delay(1000);
+    digitalWrite(MODEM_PWR, LOW);
+
+    delay(5000);
 
     int retry = 0;
-    while (!Modem::sendAtAndRead("AT", NULL, 0, 1000)) 
+    while (!Modem::sendAtAndRead("AT", buffer, sizeof(buffer), 1000))
     {
-        if (retry++ > 15) 
+        if (retry++ > 10)
         {
-            digitalWrite(MODEM_PWR, LOW);
-            delay(100);
             digitalWrite(MODEM_PWR, HIGH);
-            delay(100);
+            delay(1000);
             digitalWrite(MODEM_PWR, LOW);
             retry = 0;
         }
     }
-    
-    Modem::sendAtAndRead("AT+CGNSPWR=1", NULL, 0, 1000);
-    delay(100);
+
+    int retries = 3;
+
+    auto sendWithRetry = [&](const char* cmd, unsigned long timeout_ms, int delay_ms = 200) -> bool 
+    {
+        for(int i = 0; i < retries; i++) 
+        {
+            if(Modem::sendAtAndRead(cmd, buffer, sizeof(buffer), timeout_ms))
+                return true;
+            delay(delay_ms);
+        }
+        return false;
+    };
+
+    sendWithRetry("AT+CFUN=1", 2000);
+    delay(1000);
+
+    sendWithRetry("AT+CGNSMOD=15", 1000);
+    delay(500);
+
+    sendWithRetry("AT+CGANT=0", 1000);
+    delay(500);
+
+    sendWithRetry("AT+CGNSPWR=1", 2000);
+    delay(1000);
 }
 
 
