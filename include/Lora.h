@@ -42,6 +42,17 @@ namespace Lora
     void turnOff();
 
     /**
+     * @brief Restores a saved session if available, otherwise joins OTAA and stores the session.
+     *
+     * Must be called after turnOn(). This centralizes the session bootstrap logic so
+     * the application can safely query the current payload size only after a session exists.
+     *
+     * @return true  A LoRaWAN session is ready for transmission.
+     * @return false Session restoration/join failed.
+     */
+    bool ensureSessionReady();
+
+    /**
      * @brief Returns the maximum number of Data records that fit in a single LoRaWAN uplink.
      *
      * Calculates the maximum number of Data structures that can be transmitted in a
@@ -52,6 +63,7 @@ namespace Lora
      * measurements are available to efficiently transmit one packet.
      *
      * @return uint8_t Maximum number of Data records that fit in one LoRaWAN uplink.
+     *                 Returns 0 until a session is active and the payload size is known.
     */
     uint8_t getMaxItemsPerPacket();
 

@@ -155,6 +155,20 @@ bool Lora::restoreLoRaSessionFromRTC()
 }
 
 
+bool Lora::ensureSessionReady()
+{
+    bool session_ok = restoreLoRaSessionFromRTC();
+
+    if (!session_ok)
+    {
+        session_ok = joinOTAA();
+        if (session_ok)
+            saveLoRaSessionToRTC();
+    }
+
+    return session_ok;
+}
+
 uint8_t Lora::sendBatch(CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer)
 {
     if(buffer.empty())

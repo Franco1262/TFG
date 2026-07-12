@@ -58,39 +58,34 @@ void setup()
     if (sensor_ok) 
         rtc_buffer.push(data);
 
-    DEBUG_PRINTLN("Debug size: ");
-    DEBUG_PRINTLN(Lora::getMaxItemsPerPacket());
-    if (rtc_buffer.size() >= 1)  
+    if (rtc_buffer.size() >= MIN_ITEMS_TO_ATTEMPT_SEND)
     {
-        SD::powerOn();
-        if (SD::mount())
-        {
-            SD::logBatch(rtc_buffer);
-        }
-        SD::shutdown();
-
         if (Lora::turnOn())
         {
-            bool session_ok = Lora::restoreLoRaSessionFromRTC();
-
-            if (!session_ok)
-            {
-                session_ok = Lora::joinOTAA();
-                if (session_ok)
-                    Lora::saveLoRaSessionToRTC();
-            }
+            bool session_ok = Lora::ensureSessionReady();
 
             if (session_ok)
             {
-                uint8_t n_items_sent = Lora::sendBatch(rtc_buffer);
+                const uint8_t max_items_per_packet = Lora::getMaxItemsPerPacket();
 
-                if(n_items_sent > 0)
+                if (max_items_per_packet > 0 && rtc_buffer.size() >= max_items_per_packet)
                 {
-                    rtc_buffer.discard(n_items_sent);
-                    Lora::saveLoRaSessionToRTC();
+                    // SD::powerOn();
+                    // if (SD::mount())
+                    // {
+                    //     SD::logBatch(rtc_buffer);
+                    // }
+                    // SD::shutdown();
+
+                    uint8_t n_items_sent = Lora::sendBatch(rtc_buffer);
+
+                    if(n_items_sent > 0)
+                    {
+                        rtc_buffer.discard(n_items_sent);
+                        Lora::saveLoRaSessionToRTC();
+                    }
                 }
             }
-
             Lora::turnOff();
         }
     }

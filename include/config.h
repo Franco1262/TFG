@@ -12,6 +12,7 @@ static constexpr int MAX_PAYLOAD_SF7_SF8 = 222;
 static constexpr int MAX_PAYLOAD_SF9 = 115;
 static constexpr int MAX_PAYLOAD_SF10_SF12 = 51;
 
+static constexpr uint8_t MIN_ITEMS_TO_ATTEMPT_SEND = 4;
 static constexpr int MAX_ABSOLUTE_BATCH_SIZE = 256;
 
 
