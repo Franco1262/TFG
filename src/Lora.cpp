@@ -171,7 +171,7 @@ bool Lora::ensureSessionReady()
 }
 
 
-uint8_t Lora::sendBatch(CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer)
+uint8_t Lora::sendBatch(const CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer)
 {
     if(buffer.empty())
         return 0;
@@ -202,13 +202,6 @@ uint8_t Lora::sendBatch(CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer)
         DEBUG_PRINTLN(state);
         return 0;
     }
-
-    if(items_to_send == 0)
-        return 0;
-
-    Data dummy;
-    for (uint8_t i = 0; i < items_to_send; i++) 
-        buffer.pop(dummy); 
 
     return items_to_send;
 }

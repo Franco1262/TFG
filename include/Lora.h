@@ -86,13 +86,13 @@ namespace Lora
 
     /**
      * @brief Sends queued Data packets in batches respecting LoRa payload limits.
-     * @details Transmits packets that fit within the current LoRa payload size.
-     * May not send entire buffer if limited by payload size - caller should retry remaining items.
+    * @details Transmits one packet that fits within the current LoRa payload size.
+    * The source buffer is not modified; the caller removes records after success.
      * 
      * @param buffer Reference to CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE> containing packets to send.
      * @return Number of items actually sent (0 if send failed, > 0 if successful).
      */
-    uint8_t sendBatch(CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer);
+    uint8_t sendBatch(const CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer);
 
     /**
      * @brief Saves the current LoRaWAN Nonces buffer to Non-Volatile Storage (NVS).
