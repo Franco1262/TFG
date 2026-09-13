@@ -70,14 +70,19 @@ void setup()
 
                 if (max_items_per_packet > 0 && rtc_buffer.size() >= max_items_per_packet)
                 {
-                    // SD::powerOn();
-                    // if (SD::mount())
-                    // {
-                    //     SD::logBatch(rtc_buffer);
-                    // }
-                    // SD::shutdown();
+                    SD::powerOn();
+                    if (SD::mount())
+                    {
+                        if (!SD::logBatch(rtc_buffer, max_items_per_packet))
+                            DEBUG_PRINTLN("Could not write daily log");
+                    }
+                    else
+                    {
+                        DEBUG_PRINTLN("Could not mount SD for daily log");
+                    }
+                    SD::shutdown();
 
-                    uint8_t n_items_sent = Lora::sendBatch(rtc_buffer);
+                    const uint8_t n_items_sent = Lora::sendBatch(rtc_buffer);
 
                     if(n_items_sent > 0)
                     {

@@ -1,7 +1,5 @@
 #include "SD.h"
 
-static const char* PENDING_FILE = "/pending.bin";
-
 
 void SD::powerOn()
 {
@@ -16,57 +14,7 @@ bool SD::mount()
 }
 
 
-void SD::printSDFile(const char* path) 
-{
-    if (!SD_MMC.begin()) {
-        Serial.println("Error inicializando SD");
-        return;
-    }
-
-    File file = SD_MMC.open(path, FILE_READ);
-    if (!file) {
-        Serial.println("No se pudo abrir el archivo");
-        return;
-    }
-
-    Serial.printf("Contenido de %s:\n", path);
-
-    // Leer línea por línea
-    while (file.available()) {
-        String line = file.readStringUntil('\n');
-        Serial.println(line);
-    }
-
-    file.close();
-    Serial.println("--- Fin del archivo ---");
-}
-
-
-void SD::writeToDailyLog(Data& data)
-{
-    char file_name[32];
-    char date_buffer[11];
-    snprintf(file_name, sizeof(file_name), "/%s.jsonl", Clock::getDate(date_buffer, sizeof(date_buffer)));
-
-    File file = SD_MMC.open(file_name, FILE_APPEND);
-
-    if (!file) 
-        return;
-    
-    char buffer[256];
-    snprintf(buffer, sizeof(buffer),
-        "{\"ts\":%u,\"temp\":%.2f,\"hum\":%.2f,\"ec\":%u,\"ph\":%.1f,\"n\":%u,\"p\":%u,\"k\":%u,\"bat\":%u}",
-        data.timestamp, data.temperature / 100.0, data.humidity / 100.0,
-        data.conductivity, data.ph / 10.0, data.nitrogen, data.phosphorus,
-        data.potassium, data.battery
-    );
-
-    file.println(buffer);
-    file.close();
-}
-
-
-void SD::logBatch(const CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer)
+bool SD::logBatch(const CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer, uint8_t count)
 {
     char file_name[32];
     char date_buffer[11];
@@ -74,10 +22,14 @@ void SD::logBatch(const CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer)
 
     File file = SD_MMC.open(file_name, FILE_APPEND);
     if (!file)
-        return;
+        return false;
 
+    uint8_t written = 0;
     for (const auto& data : buffer)
     {
+        if (written >= count)
+            break;
+
         char json_buffer[256];
         snprintf(json_buffer, sizeof(json_buffer),
             "{\"ts\":%u,\"temp\":%.2f,\"hum\":%.2f,\"ec\":%u,\"ph\":%.1f,\"n\":%u,\"p\":%u,\"k\":%u,\"bat\":%u}",
@@ -85,23 +37,13 @@ void SD::logBatch(const CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer)
             data.conductivity, data.ph / 10.0, data.nitrogen,
             data.phosphorus, data.potassium, data.battery
         );
-        file.println(json_buffer);
+        if (file.println(json_buffer) == 0)
+            break;
+        written++;
     }
 
     file.close();
-}
-
-
-void SD::writeToPending(Data& data)
-{
-    File file = SD_MMC.open(PENDING_FILE, FILE_APPEND);
-    
-    if (!file) 
-        return;
-    
-    size_t written = file.write((const uint8_t*)&data, sizeof(Data));
-
-    file.close();
+    return written == count;
 }
 
 
@@ -109,11 +51,4 @@ void SD::shutdown()
 {
     SD_MMC.end();
     Power::disableSDCardPower();
-}
-
-
-void SD::clearPending()
-{
-    if (SD_MMC.exists(PENDING_FILE)) 
-        SD_MMC.remove(PENDING_FILE);
 }
