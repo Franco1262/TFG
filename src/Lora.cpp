@@ -6,6 +6,7 @@ uint64_t devEUI  = 0x1122334455667788;
 uint64_t joinEUI = 0x70B3D57ED0012345;
 uint8_t  appKey[]  = { 0xB2, 0x45, 0xE8, 0x9F, 0xF8, 0x7E, 0xE8, 0x8D, 0xFB, 0xA6, 0x52, 0x8E, 0xD1, 0x52, 0xD9, 0x11 };
 
+static Preferences prefs;
 RTC_DATA_ATTR uint8_t lorawanSession[RADIOLIB_LORAWAN_SESSION_BUF_SIZE];
 RTC_DATA_ATTR uint8_t lorawanNonces[RADIOLIB_LORAWAN_NONCES_BUF_SIZE];
 RTC_DATA_ATTR bool lorawanSessionValid = false;
@@ -83,21 +84,21 @@ void Lora::turnOff()
 
 bool Lora::joinOTAA()
 {
-    int state;
-    
-    state = node.beginOTAA(joinEUI, devEUI, appKey, appKey);
+    int state = node.beginOTAA(joinEUI, devEUI, appKey, appKey);
     if (state < RADIOLIB_ERR_NONE)
         return false;
-    
+
+    restoreNoncesFromNVS();
+
     state = node.activateOTAA();
 
     if (state != RADIOLIB_LORAWAN_NEW_SESSION)
     {
         DEBUG_PRINTLN("There was an error when activating LoraWAN session, error code: ");
         DEBUG_PRINTLN(state);
+        saveNoncesToNVS();
         return false;
     }
-        
 
     node.setADR(true);
 
@@ -169,6 +170,7 @@ bool Lora::ensureSessionReady()
     return session_ok;
 }
 
+
 uint8_t Lora::sendBatch(CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer)
 {
     if(buffer.empty())
@@ -215,4 +217,26 @@ uint8_t Lora::sendBatch(CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer)
 uint8_t Lora::getMaxItemsPerPacket()
 {
     return node.getMaxPayloadLen() / sizeof(Data);
+}
+
+
+void Lora::saveNoncesToNVS()
+{
+    prefs.begin("lora_nv", false);
+    prefs.putBytes("nonces", node.getBufferNonces(), RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
+    prefs.end();
+    DEBUG_PRINTLN("[NVS] Nonces updated in flash");
+}
+
+
+void Lora::restoreNoncesFromNVS()
+{
+    prefs.begin("lora_nv", true);
+    if (prefs.isKey("nonces"))
+    {
+        prefs.getBytes("nonces", lorawanNonces, RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
+        node.setBufferNonces(lorawanNonces);
+        DEBUG_PRINTLN("[NVS] Previous Nonces loaded from flash");
+    }
+    prefs.end();
 }

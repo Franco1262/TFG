@@ -7,6 +7,7 @@
 #include <SPI.h>
 #include <RadioLib.h>
 #include "debug.h"
+#include <Preferences.h>
 
 namespace Lora
 {
@@ -92,4 +93,28 @@ namespace Lora
      * @return Number of items actually sent (0 if send failed, > 0 if successful).
      */
     uint8_t sendBatch(CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer);
+
+    /**
+     * @brief Saves the current LoRaWAN Nonces buffer to Non-Volatile Storage (NVS).
+     * 
+     * @details Extracts only the Nonces buffer (which tracks the DevNonce and JoinNonce) 
+     * from the RadioLib node and stores it in the ESP32's flash memory. This is crucial 
+     * to call after an OTAA Join attempt—even if the attempt fails (e.g., due to bad coverage). 
+     * It ensures that the consumed DevNonce is persistently recorded so it is not reused 
+     * in the next Join attempt, preventing the network server from permanently blocking 
+     * the device due to a replay attack error.
+     */
+    static void saveNoncesToNVS();
+
+    /**
+     * @brief Restores only the LoRaWAN Nonces buffer from Non-Volatile Storage (NVS).
+     * 
+     * @details Reads the previously saved Nonces buffer from flash memory and injects it 
+     * into the RadioLib node. This function must be called right before initiating a 
+     * new OTAA Join-Request (when a full session restore is not possible or desired). 
+     * By pre-loading the historical nonces, it forces the node to increment the DevNonce 
+     * from its last known value rather than starting from zero, ensuring the network server 
+     * (like ChirpStack) accepts the new Join request.
+     */
+    static void restoreNoncesFromNVS();
 }
