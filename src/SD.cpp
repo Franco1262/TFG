@@ -55,9 +55,10 @@ void SD::writeToDailyLog(Data& data)
     
     char buffer[256];
     snprintf(buffer, sizeof(buffer),
-        "{\"ts\":%u,\"temp\":%.2f,\"hum\":%.2f,\"ec\":%d,\"ph\":%d,\"n\":%d,\"p\":%d,\"k\":%d,\"bat\":%u}",
-        data.timestamp, data.temperature, data.humidity, data.conductivity,
-        data.ph, data.nitrogen, data.phosphorus, data.potassium, data.battery
+        "{\"ts\":%u,\"temp\":%.2f,\"hum\":%.2f,\"ec\":%u,\"ph\":%.1f,\"n\":%u,\"p\":%u,\"k\":%u,\"bat\":%u}",
+        data.timestamp, data.temperature / 100.0, data.humidity / 100.0,
+        data.conductivity, data.ph / 10.0, data.nitrogen, data.phosphorus,
+        data.potassium, data.battery
     );
 
     file.println(buffer);
@@ -79,9 +80,9 @@ void SD::logBatch(const CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer)
     {
         char json_buffer[256];
         snprintf(json_buffer, sizeof(json_buffer),
-            "{\"ts\":%u,\"temp\":%.2f,\"hum\":%.2f,\"ec\":%d,\"ph\":%d,\"n\":%d,\"p\":%d,\"k\":%d,\"bat\":%u}",
-            data.timestamp, data.temperature, data.humidity,
-            data.conductivity, data.ph, data.nitrogen,
+            "{\"ts\":%u,\"temp\":%.2f,\"hum\":%.2f,\"ec\":%u,\"ph\":%.1f,\"n\":%u,\"p\":%u,\"k\":%u,\"bat\":%u}",
+            data.timestamp, data.temperature / 100.0, data.humidity / 100.0,
+            data.conductivity, data.ph / 10.0, data.nitrogen,
             data.phosphorus, data.potassium, data.battery
         );
         file.println(json_buffer);
