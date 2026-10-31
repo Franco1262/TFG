@@ -13,6 +13,7 @@ RTC_DATA_ATTR bool lorawanSessionValid = false;
 
 static SX1276 radio = new Module(LORA_SS, LORA_DIO0, LORA_RST, LORA_DIO1);
 static LoRaWANNode node(&radio, &EU868);
+static int16_t lastSessionStatus = RADIOLIB_ERR_NONE;
 
 static void printHexBuffer(const char* label, const uint8_t* buf, size_t len)
 {
@@ -86,12 +87,14 @@ void Lora::turnOff()
 bool Lora::joinOTAA()
 {
     int state = node.beginOTAA(joinEUI, devEUI, appKey, appKey);
+    lastSessionStatus = state;
     if (state < RADIOLIB_ERR_NONE)
         return false;
 
     restoreNoncesFromNVS();
 
     state = node.activateOTAA();
+    lastSessionStatus = state;
 
     if (state != RADIOLIB_LORAWAN_NEW_SESSION)
     {
@@ -130,7 +133,8 @@ bool Lora::restoreLoRaSessionFromRTC()
     if (!lorawanSessionValid)
         return false;
 
-    if (node.beginOTAA(joinEUI, devEUI, appKey, appKey) < RADIOLIB_ERR_NONE)
+    lastSessionStatus = node.beginOTAA(joinEUI, devEUI, appKey, appKey);
+    if (lastSessionStatus < RADIOLIB_ERR_NONE)
         return false;
 
     DEBUG_PRINTLN("Restoring LoRaWAN session from RTC:");
@@ -144,6 +148,7 @@ bool Lora::restoreLoRaSessionFromRTC()
     DEBUG_PRINTF("setBufferSession = %d\n", s2);
 
     int state = node.activateOTAA();
+    lastSessionStatus = state;
     if (state != RADIOLIB_LORAWAN_SESSION_RESTORED)
     {
         DEBUG_PRINTLN("There was an error when re-activating LoraWAN session");
@@ -172,9 +177,19 @@ bool Lora::ensureSessionReady()
 }
 
 
-uint8_t Lora::sendBatch(const CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer)
+int16_t Lora::getSessionStatus()
 {
-    if(buffer.empty())
+    return lastSessionStatus;
+}
+
+
+uint8_t Lora::sendBatch(const CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer,
+                        size_t count, int16_t* result)
+{
+    if (result != nullptr)
+        *result = RADIOLIB_ERR_NONE;
+
+    if(buffer.empty() || count == 0)
         return 0;
 
     constexpr uint8_t LORAWAN_MAX_PAYLOAD = 242;
@@ -182,12 +197,19 @@ uint8_t Lora::sendBatch(const CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buf
     
     uint8_t maxLen = node.getMaxPayloadLen();
     uint8_t max_items = maxLen / sizeof(Data);
+    if (max_items == 0)
+    {
+        if (result != nullptr)
+            *result = RADIOLIB_ERR_PACKET_TOO_LONG;
+        return 0;
+    }
+
     uint8_t len = 0;
     uint8_t items_to_send = 0;
 
     for (const auto& data : buffer)
     {
-        if (items_to_send >= max_items) 
+        if (items_to_send >= max_items || items_to_send >= count)
             break;
         
         *reinterpret_cast<Data*>(payload + len) = data;
@@ -196,6 +218,8 @@ uint8_t Lora::sendBatch(const CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buf
     }
 
     int state = node.sendReceive(payload, len);
+    if (result != nullptr)
+        *result = state;
 
     if (state < RADIOLIB_ERR_NONE) 
     {

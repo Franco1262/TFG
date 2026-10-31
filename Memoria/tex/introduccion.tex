@@ -41,11 +41,14 @@ por lotes (\textit{batching}) en una única trama LoRaWAN activada por OTAA.
 
 Asimismo, la arquitectura contempla persistencia local en la tarjeta microSD (bus SD-MMC).
 El protocolo de envío agrupa las muestras del búfer RTC en lotes y limita a dos los intentos de
-transmisión de cada lote. Si falla el primer intento, el lote permanece en el búfer y se activa
-\texttt{retry\_pending}, estado que se conserva durante la suspensión profunda. Si el segundo intento
-también falla, el lote se registra en el histórico de auditoría JSON Lines (\texttt{.jsonl}) de la SD
-y se descarta del búfer; si el envío tiene éxito, también se registra en la SD y se descarta el lote
-transmitido. El lote, identificado de forma estable para poder reconocerlo tras el \textit{Deep Sleep}, se
+transmisión de cada lote. Si falla el primer intento, el lote permanece en el búfer y su identidad,
+número de muestras e intentos consumidos se conservan en \texttt{pending\_batch} durante la suspensión profunda.
+Si en el segundo intento cabe menos información, se intenta enviar el prefijo que quepa y el excedente
+se conserva para un lote nuevo, con su propio presupuesto de dos intentos. El prefijo se registra en el
+histórico de auditoría JSON Lines (\texttt{.jsonl}) y se descarta tanto si tiene éxito como si agota el
+segundo intento. Si ese segundo intento no puede enviar ninguna muestra por fallo de radio, sesión o
+capacidad nula, se registra y descarta el lote pendiente completo. Se considera éxito la transmisión
+local sin error, no la confirmación de recepción por la pasarela. Cada conjunto finalizado se
 registra una sola vez para evitar duplicados. Los errores de
 escritura en SD se notifican explícitamente, pero el lote se descarta igualmente para mantener acotado
 el búfer, aceptando la posible pérdida de ese registro. La SD actúa como histórico y no como cola de
@@ -93,7 +96,7 @@ Para la consecución de esta meta global, se definen los siguientes \textbf{obje
 
     \item \textbf{Optimización de radio LoRaWAN y transmisión por lotes:} Implementar la pila LoRaWAN sobre la banda EU868 con activación OTAA, incorporando un algoritmo de cálculo dinámico del tamaño máximo de carga útil para agrupar lecturas en lotes (\textit{batching}) en una estructura binaria compacta de 19 bytes, y preservando el estado de la sesión de red en memoria RTC para evitar renegociaciones tras cada suspensión.
 
-    \item \textbf{Gestión acotada del búfer y tolerancia a fallos:} Mantener las muestras en un búfer circular en la memoria RTC Slow RAM y agruparlas en lotes para su transmisión. Cada lote tendrá como máximo dos intentos: si falla el primero, se conservará en RTC y se marcará con \texttt{retry\_pending}, estado que sobrevivirá al \textit{Deep Sleep}; la referencia estable del lote y su número de muestras permitirán no confundirlo con las muestras nuevas. Tras un segundo fallo o un envío exitoso, se registrará una sola vez en el histórico JSON Lines de la microSD y se descartará únicamente ese lote. Si falla el registro en SD, se notificará el error y se descartará igualmente el lote para mantener acotado el búfer, aceptando la posible pérdida del registro. La SD no actuará como cola de reenvío.
+    \item \textbf{Gestión acotada del búfer y tolerancia a fallos:} Mantener las muestras en un búfer circular en la memoria RTC Slow RAM y agruparlas en lotes para su transmisión. Conservar en RTC la referencia de la muestra más antigua, el número de muestras y los intentos consumidos. Tras el primer fallo se conserva el lote; tras éxito o segundo fallo se registra y descarta el conjunto finalizado. Si en el segundo intento solo cabe un prefijo, el excedente pasa a un lote nuevo sin ser registrado ni descartado todavía. Si no puede enviarse ninguna muestra en el segundo intento, se finaliza el lote pendiente completo. Los errores de SD se notifican y no impiden liberar el conjunto finalizado. La SD no actúa como cola de reenvío.
 
     \item \textbf{Despliegue del backend receptor y persistencia de series temporales:} Orquestar en la Raspberry Pi una pasarela LoRaWAN con concentrador SPI, integrando el servidor ChirpStack, el intermediario MQTT (Mosquitto) y un servicio puente en Python para decodificar las tramas e indexar las mediciones en una base de datos relacional PostgreSQL.
 

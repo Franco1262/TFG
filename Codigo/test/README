@@ -1,11 +1,17 @@
 
-This directory is intended for PlatformIO Test Runner and project tests.
+Batch-flow contract checks
 
-Unit Testing is a software testing method by which individual units of
-source code, sets of one or more MCU program modules together with associated
-control data, usage procedures, and operating procedures, are tested to
-determine whether they are fit for use. Unit testing finds problems early
-in the development cycle.
+Run from the repository root:
+	python Codigo/test/test_batch_contract.py
 
-More information about PlatformIO Unit Testing:
-- https://docs.platformio.org/en/latest/advanced/unit-testing/index.html
+The script uses the real PendingBatch and CircularBuffer definitions and the
+initRtcBuffer, processBatch and finalizeBatch bodies from main.cpp. Radio and
+SD operations are simulated. The buffer and flow are made constexpr only in
+the test copy so a GNU C++ compiler can evaluate the scenarios at compile time.
+No test binary or temporary source file is written.
+
+The compiler is selected through --compiler, CXX, g++ in PATH, or the usual
+Windows PlatformIO Xtensa compiler location. Python standard library only.
+
+These checks do not validate actual radio transmission, physical RTC retention,
+SD write integrity, GNSS, power consumption or the soil sensor.

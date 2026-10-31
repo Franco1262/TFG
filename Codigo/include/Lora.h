@@ -50,8 +50,11 @@ namespace Lora
      *
      * @return true  A LoRaWAN session is ready for transmission.
      * @return false Session restoration/join failed.
+    * getSessionStatus() exposes the last setup result to distinguish duty-cycle deferrals.
      */
     bool ensureSessionReady();
+
+    int16_t getSessionStatus();
 
     /**
      * @brief Returns the maximum number of Data records that fit in a single LoRaWAN uplink.
@@ -90,9 +93,12 @@ namespace Lora
     * The source buffer is not modified; the caller removes records after success.
      * 
      * @param buffer Reference to CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE> containing packets to send.
+    * @param count Maximum number of oldest samples to include.
+    * @param result Optional RadioLib status, including duty-cycle deferrals.
      * @return Number of items actually sent (0 if send failed, > 0 if successful).
      */
-    uint8_t sendBatch(const CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer);
+    uint8_t sendBatch(const CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer,
+                  size_t count = MAX_ABSOLUTE_BATCH_SIZE, int16_t* result = nullptr);
 
     /**
      * @brief Saves the current LoRaWAN Nonces buffer to Non-Volatile Storage (NVS).

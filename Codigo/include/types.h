@@ -22,3 +22,20 @@ struct LoRaSessionState {
     uint32_t seqnoUp;
     uint32_t seqnoDn;
 };
+
+struct PendingBatch {
+    uint32_t first_sample;
+    uint8_t count;
+    uint8_t attempts;
+
+    constexpr bool active() const { return count > 0; }
+    constexpr bool exhausted() const { return attempts >= 2; }
+
+    constexpr PendingBatch forCapacity(uint8_t capacity) const {
+        return {first_sample, static_cast<uint8_t>(capacity > 0 && capacity < count ? capacity : count), attempts};
+    }
+
+    constexpr PendingBatch afterFailure() const {
+        return {first_sample, count, static_cast<uint8_t>(attempts + 1)};
+    }
+};
