@@ -1,0 +1,92 @@
+\section{Análisis de aplicaciones similares}
+
+En la última década, la digitalización agrícola y las técnicas de agricultura de precisión han impulsado el desarrollo de diversos ecosistemas comerciales y prototipos académicos orientados a la adquisición remota de parámetros agroclimáticos y edafológicos. A continuación, se examinan las principales aproximaciones existentes en el mercado y la literatura técnica:
+
+\begin{itemize}
+    \item \textbf{Plataformas comerciales modulares (p. ej., Libelium Plug \& Sense! Smart Agriculture):} Constituyen una de las referencias industriales en el sector IoT. Ofrecen encapsulados con certificación IP67, compatibilidad con transceptores multirradio (LoRaWAN, 4G, Zigbee) y soporte para sondas de marcas reconocidas. No obstante, presentan barreras significativas para explotaciones medianas o proyectos de investigación debido a su elevado coste por nodo (frecuentemente superior a 1.000~euros) y a una arquitectura de firmware restrictiva que suele condicionar el almacenamiento y análisis de las métricas a nubes propietarias bajo modelos de suscripción periódica.
+
+    \item \textbf{Ecosistemas propietarios basados en estaciones y nodos repetidores (p. ej., Davis Instruments EnviroMonitor):} Emplean una topología en malla (\textit{mesh}) de nodos de campo de bajo alcance que convergen hacia una pasarela central dotada de módem celular comercial. Si bien simplifican la instalación para usuarios no técnicos, este diseño impone una dependencia absoluta de la cobertura móvil en el punto de agregación, costes operativos recurrentes por planes de datos SIM y el confinamiento de la información en servidores del propio fabricante.
+
+    \item \textbf{Sistemas cerrados de monitorización en profundidad (p. ej., Pessl Instruments iMETOS o Sentek Drill \& Drop):} Enfocados en la determinación de perfiles de humedad y salinidad a múltiples estratos de profundidad mediante sondas capacitivas tubulares. A pesar de su excelente precisión metrológica, son plataformas de integración rígida con interfaces de comunicación cerradas que impiden la interoperabilidad con infraestructuras privadas locales y exigen cuotas continuadas por el uso del software de gestión agronómica.
+
+    \item \textbf{Prototipos abiertos y proyectos DIY basados en microcontroladores básicos (Arduino, ESP8266):} En el ámbito académico y de código abierto proliferan desarrollos basados en placas de bajo coste asociadas a sondas resistivas simples. Aunque resultan económicos, adolecen de severas carencias para un despliegue operativo: las sondas resistivas sufren una rápida degradación por electrólisis, los microcontroladores carecen de memoria no volátil de bajo consumo retenida para gestionar estados de red y, al prescindir de circuitos dedicados de gestión de potencia (PMU), la autonomía de la batería raramente supera unas pocas semanas.
+\end{itemize}
+
+En la Cuadro~\ref{tab:comparativa_aplicaciones} se sintetizan las diferencias arquitectónicas y operativas entre las soluciones comerciales, los proyectos de prototipado estándar y la propuesta implementada en este trabajo.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{p{3.8cm} p{3.6cm} p{3.4cm} p{4cm}}
+\hline
+\textbf{Criterio} & \textbf{Soluciones Comerciales} & \textbf{Proyectos DIY Básicos} & \textbf{Propuesta de este TFG} \\ \hline
+\textbf{Coste unitario por nodo} & Elevado ($>$ 600\,--\,1.500\,€) & Muy bajo ($<$ 30\,€) & Moderado / Accesible ($\sim$80\,--\,110\,€) \\
+\textbf{Coste recurrente (SaaS)} & Obligatorio por suscripción & Inexistente & Nulo (Servicios \textit{Open Source}) \\
+\textbf{Soberanía de datos} & Nube cerrada de fabricante & Variable / Limitada & Total (Base local PostgreSQL) \\
+\textbf{Sonda edafológica} & Propietaria / Específica & Resistiva (Corrosión rápida) & Industrial multivariable (RS-485) \\
+\textbf{Gestión de potencia} & Firmware cerrado & \textit{Loop} continuo / Sin PMU & PMU AXP2101 + RTC Slow RAM \\
+\textbf{Resiliencia local} & Variable / Opaca & Inexistente & Módem GNSS + Tarjeta microSD \\
+\textbf{Despliegue de red} & Operador comercial / Celular & Enlaces locales directos & Red privada LoRaWAN local \\ \hline
+\end{tabular}
+\caption{Comparativa entre soluciones existentes y el sistema desarrollado.}
+\label{tab:comparativa_aplicaciones}
+\end{table}
+
+Frente a las limitaciones descritas, este Trabajo Fin de Grado aporta una solución equilibrada sustentada en tres pilares de ingeniería: soberanía completa del dato sin recurrir a costes de suscripción, integración de instrumentación industrial robusta (Modbus RTU sobre RS-485) y una gestión energética rigurosa capaz de combinar periodos prolongados de suspensión profunda (\textit{Deep Sleep}) con mecanismos de respaldo local y resincronización horaria absoluta.
+
+
+\section{Tecnologías}
+
+El diseño de la arquitectura integral del sistema requiere la selección justificada de componentes hardware, tecnologías de radio y plataformas de software para satisfacer los requisitos de bajo consumo, robustez ambiental e interoperabilidad.
+
+\subsection{Comunicaciones inalámbricas: LoRaWAN frente a alternativas LPWAN}
+
+En la sensorización de parcelas agrícolas extensas, el enlace inalámbrico debe superar distancias kilométricas con un gasto energético mínimo. Se analizaron las tres principales tecnologías englobadas bajo el estándar LPWAN (\textit{Low-Power Wide-Area Network}):
+
+\begin{itemize}
+    \item \textbf{NB-IoT / LTE-M:} Operan sobre el espectro licenciado de redes celulares comerciales, ofreciendo anchos de banda superiores y latencias contenidas. Sin embargo, presentan dos inconvenientes insalvables para este escenario: exigen contratos y tarjetas SIM para cada nodo (incurriendo en costes fijos mensuales) y su cobertura en fincas rurales o áreas montañosas remotas es con frecuencia inexistente o deficiente.
+
+    \item \textbf{Sigfox:} Tecnología ultra-estrecha (\textit{Ultra Narrow Band}) con bajo consumo y excelente sensibilidad. No obstante, opera bajo una red centralizada gestionada por un único operador global, impone una limitación restrictiva de 140 mensajes diarios de 12 bytes de carga útil y carece de la posibilidad de desplegar pasarelas privadas para dar cobertura a zonas de sombra.
+
+    \item \textbf{LoRaWAN (Tecnología seleccionada):} Emplea la modulación por espectro ensanchado (\textit{Chirp Spread Spectrum}) en bandas no licenciadas (Banda ISM EU868). Esta elección se justifica por:
+    \begin{enumerate}
+        \item Capacidad de despliegue de redes totalmente privadas mediante la instalación de pasarelas locales propias, sin dependencia de operadores de telecomunicaciones ni costes de tráfico.
+        \item Elevado presupuesto de enlace (\textit{link budget}), permitiendo coberturas superiores a 5--10~km en línea de vista con potencias de emisión de apenas 14~dBm (25~mW).
+        \item Mecanismos de adaptación dinámica de tasa de transferencia (\textit{Adaptive Data Rate}, ADR) y activación segura por el aire (\textit{Over-The-Air Activation}, OTAA) mediante derivación criptográfica de claves de sesión (NwkSKey, AppSKey).
+    \end{enumerate}
+\end{itemize}
+
+\subsection{Plataforma de computación embebida y gestión de energía}
+
+El nodo sensor exige un equilibrio entre capacidad de cálculo, interfaces de comunicación serie, retención de datos volátiles y consumo de corriente residual durante las fases de inactividad:
+
+\begin{itemize}
+    \item \textbf{Microcontrolador ESP32-S3 (Placa LilyGO T-SIM7080G):} Se seleccionó por integrar una CPU de doble núcleo Xtensa LX7 de 32 bits junto a una región especializada de memoria denominada \textit{RTC Slow RAM}. Dicha memoria permite mantener alimentadas estructuras de datos críticas (como el búfer circular de muestreo y los contadores de la sesión LoRaWAN) durante los estados de suspensión profunda (\textit{Deep Sleep}), donde el consumo del núcleo desciende a niveles del orden de microamperios sin perder el contexto de ejecución. Otras opciones como la familia ATmega328P, carecen de suficiente memoria SRAM para soportar simultáneamente la pila LoRaWAN y los búferes de la tarjeta SD; por su parte, microcontroladores como el ESP8266 presentan un consumo en reposo sustancialmente mayor y carecen de interfaces nativas avanzadas.
+
+    \item \textbf{Unidad de Gestión de Potencia (PMU AXP2101):} La placa integra el circuito integrado AXP2101, controlable por bus I$^2$C. Su inclusión es determinante para desacoplar y apagar selectivamente los carriles regulados de alimentación de periféricos con consumos de reposo significativos (módem GNSS, transceptor RS-485, ranura microSD y transceptor LoRa), mitigando las corrientes parásitas y maximizando la eficiencia de la celda de litio.
+
+    \item \textbf{Módem auxiliar GNSS (SIM7080G):} Los osciladores internos del microcontrolador presentan una deriva térmica inevitable (\textit{drift}) que descalibra el reloj de tiempo real a lo largo de los días. En lugar de mantener un módulo receptor activo continuamente, el módem satelital se excita únicamente bajo demanda para resincronizar la marca temporal UTC con precisión de milisegundos.
+\end{itemize}
+
+\subsection{Instrumentación edáfica y bus de comunicaciones de campo}
+
+Para la caracterización del sustrato se descartaron las sondas analógicas tradicionales debido a su vulnerabilidad al ruido electromagnético y a la atenuación de tensión provocada por la resistencia del cableado:
+
+\begin{itemize}
+    \item \textbf{Par trenzado diferencial RS-485:} Permite una transmisión diferencial inmune a interferencias generadas por motores eléctricos, electroválvulas o bombas de riego presentes en explotaciones agrarias, admitiendo tiradas de cableado de decenas de metros sin pérdida de integridad lógica.
+    \item \textbf{Protocolo Modbus RTU:} Protocolo maestro-esclavo estándar en la industria de automatización. Permite interrogar los registros de retención (\textit{Holding Registers}, código de función \texttt{0x03}) de una sonda multivariable integrada, obteniendo de manera atómica 8 parámetros críticos en una única transacción serie: humedad volumétrica, temperatura, pH, conductividad eléctrica y macronutrientes (nitrógeno, fósforo y potasio).
+\end{itemize}
+
+\subsection{Infraestructura receptora, persistencia y visualización}
+
+En el extremo receptor se requería una plataforma compacta, fiable y basada en software libre capaz de operar de manera ininterrumpida:
+
+\begin{itemize}
+    \item \textbf{Raspberry Pi con concentrador LoRa SPI:} Actúa como pasarela física multicanal. A diferencia de los nodos que emplean transceptores monocanal basados en el chip SX1276, el concentrador incorpora el procesador de banda base capaz de demodular simultáneamente múltiples paquetes en diferentes frecuencias y factores de dispersión (\textit{Spreading Factors}).
+    
+    \item \textbf{Pila ChirpStack y Eclipse Mosquitto (MQTT):} ChirpStack Network Server constituye un núcleo de red de alto rendimiento que valida las sesiones LoRaWAN, aplica las funciones de descodificación de la carga útil binaria mediante scripts en JavaScript y publica los eventos de subida (\textit{uplink}) formateados en JSON hacia el intermediario MQTT local.
+
+    \item \textbf{Motor de base de datos PostgreSQL:} A diferencia de sistemas de ficheros planos o bases de datos no estructuradas, PostgreSQL provee integridad relacional estricta, compatibilidad con tipos de datos nativos para marcas temporales con zona horaria (\texttt{TIMESTAMPTZ}) e indexación especializada mediante árboles B (\textit{B-Tree}) sobre el identificador del nodo y la fecha de muestreo. Esto garantiza tiempos de respuesta mínimos en consultas temporales complejas realizadas desde el visualizador.
+
+    \item \textbf{Grafana:} Herramienta de visualización analítica que se integra de manera nativa sobre PostgreSQL mediante consultas SQL directas. Permite configurar paneles dinámicos interactivos, gráficos de series temporales para el análisis fisicoquímico, diagramas de fertilidad NPK y alertas de nivel crítico de batería del nodo sensor.
+\end{itemize}

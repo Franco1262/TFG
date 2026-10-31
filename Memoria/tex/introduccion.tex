@@ -1,0 +1,112 @@
+
+\section{Introducción}
+En las últimas décadas, el sector agrícola se enfrenta a la necesidad de optimizar el consumo de 
+recursos hídricos y fertilizantes mediante el despliegue de las denominadas técnicas de agricultura de 
+precisión (\textit{smart farming}). La monitorización de las condiciones fisicoquímicas del terreno resulta 
+determinante para prevenir la degradación de los cultivos y minimizar el impacto medioambiental. Tradicionalmente, 
+la caracterización del suelo se ha realizado mediante la recolección manual de muestras y su posterior procesado en 
+laboratorios especializados, un método costoso y con tiempos de respuesta incompatibles con la toma de decisiones ágil en campo.
+
+El paradigma del Internet de las Cosas (IoT), sustentado por microcontroladores de alta eficiencia 
+y redes de comunicación de baja potencia y largo alcance (LPWAN), permite superar estas barreras. 
+Este Trabajo Fin de Grado aborda el diseño, la implementación y la validación de un sistema integral de adquisición 
+y análisis de parámetros fisicoquímicos del suelo. La solución se fundamenta en un nodo sensor autónomo basado en el 
+módulo LilyGO T-SIM7080G provisto del microcontrolador ESP32-S3. Esta placa integra un módem SIM7080G empleado como receptor 
+GNSS para la sincronización temporal periódica de la hora del sistema, corrigiendo la desviación intrínseca (\textit{drift}) 
+del reloj en tiempo real (RTC) del microcontrolador sin incurrir en el elevado coste energético de mantener activo dicho módulo de forma continua.
+
+Para maximizar la vida útil de la celda de alimentación y asegurar una operatividad 
+desatendida a largo plazo, el nodo aprovecha la interfaz de recarga solar y el soporte 
+de batería integrados en la placa LilyGO T-SIM7080G, gobernados por la unidad de gestión 
+de potencia (PMU AXP2101). A nivel de software, el firmware opera bajo un ciclo de vida 
+periódico regido por la función \texttt{setup()}, prescindiendo del bucle continuo 
+\texttt{loop()} para alternar ráfagas breves de procesamiento con periodos prolongados 
+de suspensión profunda (\textit{Deep Sleep}). En cada despertar, el PMU conmuta de 
+forma selectiva los carriles de alimentación de los subsistemas periféricos. El nodo 
+evalúa inicialmente el porcentaje de batería para abortar el ciclo si se sitúa bajo un
+umbral crítico de protección; a continuación, excita el bus industrial RS-485 para 
+adquirir las variables de la sonda multivariable bajo el protocolo Modbus RTU e inserta 
+la muestra empaquetada (\texttt{struct Data} de 19 bytes) en un búfer circular retenido 
+en la memoria RTC Slow RAM mediante el atributo \texttt{RTC\_DATA\_ATTR}, preservando 
+las lecturas durante los ciclos de suspensión profunda, pero no ante la pérdida completa de alimentación del dominio RTC.
+
+Con el propósito de optimizar el compromiso entre el consumo energético de la radio 
+y las restricciones de tiempo en el aire (\textit{airtime}) impuestas por la normativa 
+europea en la banda EU868, el dispositivo ejecuta un algoritmo de cálculo dinámico 
+del tamaño de carga útil. Dicha lógica evalúa la capacidad máxima admitida (\textit{Max Payload}) 
+en función del factor de dispersión (\textit{Spreading Factor}) y ancho de banda vigentes, 
+determinando si el volumen de lecturas retenidas en la memoria RTC Slow RAM justifica 
+la activación del transceptor LoRa SX1276 para proceder a su transmisión agrupada 
+por lotes (\textit{batching}) en una única trama LoRaWAN activada por OTAA. 
+
+Asimismo, la arquitectura contempla persistencia local en la tarjeta microSD (bus SD-MMC).
+El protocolo de envío agrupa las muestras del búfer RTC en lotes y limita a dos los intentos de
+transmisión de cada lote. Si falla el primer intento, el lote permanece en el búfer y se activa
+\texttt{retry\_pending}, estado que se conserva durante la suspensión profunda. Si el segundo intento
+también falla, el lote se registra en el histórico de auditoría JSON Lines (\texttt{.jsonl}) de la SD
+y se descarta del búfer; si el envío tiene éxito, también se registra en la SD y se descarta el lote
+transmitido. El lote, identificado de forma estable para poder reconocerlo tras el \textit{Deep Sleep}, se
+registra una sola vez para evitar duplicados. Los errores de
+escritura en SD se notifican explícitamente, pero el lote se descarta igualmente para mantener acotado
+el búfer, aceptando la posible pérdida de ese registro. La SD actúa como histórico y no como cola de
+reenvío: los lotes descartados tras dos fallos no se retransmiten. El estado RTC identifica el lote
+pendiente, de modo que las muestras nuevas que se adquieran durante los reintentos no se descarten
+junto con él. El registro JSON Lines incluye una entrada por muestra del lote. La memoria RTC conserva
+las lecturas durante la suspensión profunda mientras permanezca alimentado el dominio RTC.
+
+Por último, la infraestructura de recepción se despliega sobre una Raspberry Pi equipada con un concentrador 
+LoRa multicanal comunicado por SPI. Mediante la orquestación de servicios desatendidos administrados por el gestor 
+de arranque \texttt{systemd}, la plataforma levanta de forma automática el \textit{packet forwarder}, el servidor de 
+red ChirpStack, el intermediario de mensajería MQTT (Mosquitto) y un servicio de ingesta desarrollado en Python. Este 
+último procesa los eventos entrantes, extrae las cargas útiles individuales o por lotes procesadas por el decodificador 
+JavaScript del perfil del dispositivo e inserta los registros en un motor relacional PostgreSQL provisto de índices específicos 
+sobre el identificador del nodo y la marca temporal, sirviendo como origen de datos optimizado para la consulta y análisis en tiempo 
+real a través de cuadros de mando interactivos en Grafana.
+
+\section{Motivación}
+La motivación de este proyecto responde a los desafíos operativos, energéticos y de fiabilidad identificados durante la digitalización del sector agroalimentario:
+
+\begin{itemize}
+    \item \textbf{Limitaciones de las plataformas comerciales:} Gran parte de las soluciones de monitorización agrícola disponibles en el mercado presentan costes elevados, ecosistemas cerrados y dependencia de cuotas de suscripción continuadas en plataformas en la nube. Existe la necesidad de desarrollar arquitecturas abiertas e interoperables, fundamentadas en tecnologías de código abierto que faciliten la soberanía de los datos y su adaptación a múltiples tipologías de cultivo.
+
+    \item \textbf{Autonomía energética en entornos rurales aislados:} Las explotaciones agrícolas suelen carecer de tendido eléctrico y cobertura celular regular. Garantizar una operatividad continua durante meses o años mediante baterías de capacidad moderada exige no solo implementar ciclos de suspensión profunda (\textit{Deep Sleep}), sino gestionar activamente los carriles de alimentación de los sensores y radios mediante una unidad de gestión de potencia (PMU), aislando los periféricos para eliminar corrientes parásitas o de fuga.
+
+    \item \textbf{Optimización del canal radioeléctrico y normativa LPWAN:} El envío indiscriminado de lecturas individuales compromete la batería y colisiona con las severas restricciones de ciclo de trabajo (\textit{duty cycle}) y tiempo en el aire (\textit{airtime}) de la banda europea EU868. El diseño exige implementar estrategias de transmisión agrupada por lotes (\textit{batching}) con cálculo dinámico de carga útil, maximizando el rendimiento del espectro radioeléctrico y minimizando los encendidos del transceptor.
+
+    \item \textbf{Tolerancia a fallos y resiliencia temporal:} En despliegues remotos, la desincronización horaria o la pérdida de enlace no deben derivar en registros inválidos. La deriva inherente al oscilador RTC del microcontrolador exige una corrección periódica mediante sincronización satelital GNSS. Ante fallos de radio, cada lote dispone de un máximo de dos intentos: tras el primero se conserva en la memoria RTC Slow RAM, y tras el segundo se registra en el histórico JSON Lines de la tarjeta microSD y se descarta para liberar espacio. La SD no funciona como cola de reenvío; si falla el registro, se notifica el error y se descarta igualmente el lote, aceptando una posible pérdida del histórico.
+
+    \item \textbf{Operación desatendida en la infraestructura de recepción:} La pasarela receptora desplegada en campo debe operar como un dispositivo autónomo (\textit{appliance}), capaz de levantar la pila de comunicaciones (servidor de red, intermediario MQTT, pasarela LoRa) y la persistencia en base de datos de manera automática tras cortes imprevistos en el suministro eléctrico, sin requerir supervisión por consola.
+
+    \item \textbf{Interés formativo y transversalidad técnica:} El proyecto ofrece la oportunidad de sintetizar y validar competencias de la Ingeniería Informática, integrando desde la programación de sistemas embebidos en C++ con restricciones en tiempo real y buses industriales (Modbus RTU sobre RS-485), hasta la ingeniería de datos en PostgreSQL, administración de servicios del sistema bajo Linux y la visualización analítica en tiempo real.
+\end{itemize}
+
+\section{Objetivos}
+El \textbf{objetivo general} de este Trabajo Fin de Grado consiste en diseñar, implementar y validar un sistema integral y autónomo de monitorización edafológica basado en un nodo sensorial IoT de ultra bajo consumo (ESP32-S3) y conectividad LoRaWAN, complementado por una estación receptora sobre Raspberry Pi encargada de la ingesta desatendida, persistencia relacional y visualización web en tiempo real de los parámetros fisicoquímicos del suelo.
+
+Para la consecución de esta meta global, se definen los siguientes \textbf{objetivos específicos}:
+\begin{itemize}
+    \item \textbf{Acondicionamiento y sensado industrial:} Integrar una sonda multivariable de suelo acoplada a un transceptor RS-485, implementando una máquina de consulta bajo el protocolo Modbus RTU para la adquisición de humedad, temperatura, pH, conductividad eléctrica y macronutrientes (nitrógeno, fósforo y potasio).
+
+    \item \textbf{Gestión energética y ciclo de vida del firmware:} Desarrollar el software embebido estructurado en ráfagas de ejecución puntual (\texttt{setup()}) seguidas de suspensión profunda (\textit{Deep Sleep}), controlando selectivamente el corte y encendido de los carriles de alimentación de los periféricos mediante el PMU AXP2101 para reducir las corrientes de fuga en reposo.
+
+    \item \textbf{Sincronización y consistencia temporal:} Integrar el módem satelital GNSS mediante comandos AT para la sincronización horaria de alta precisión en tiempo absoluto UTC, mitigando la desviación intrínseca (\textit{drift}) del reloj interno del microcontrolador sin incurrir en consumo continuo.
+
+    \item \textbf{Optimización de radio LoRaWAN y transmisión por lotes:} Implementar la pila LoRaWAN sobre la banda EU868 con activación OTAA, incorporando un algoritmo de cálculo dinámico del tamaño máximo de carga útil para agrupar lecturas en lotes (\textit{batching}) en una estructura binaria compacta de 19 bytes, y preservando el estado de la sesión de red en memoria RTC para evitar renegociaciones tras cada suspensión.
+
+    \item \textbf{Gestión acotada del búfer y tolerancia a fallos:} Mantener las muestras en un búfer circular en la memoria RTC Slow RAM y agruparlas en lotes para su transmisión. Cada lote tendrá como máximo dos intentos: si falla el primero, se conservará en RTC y se marcará con \texttt{retry\_pending}, estado que sobrevivirá al \textit{Deep Sleep}; la referencia estable del lote y su número de muestras permitirán no confundirlo con las muestras nuevas. Tras un segundo fallo o un envío exitoso, se registrará una sola vez en el histórico JSON Lines de la microSD y se descartará únicamente ese lote. Si falla el registro en SD, se notificará el error y se descartará igualmente el lote para mantener acotado el búfer, aceptando la posible pérdida del registro. La SD no actuará como cola de reenvío.
+
+    \item \textbf{Despliegue del backend receptor y persistencia de series temporales:} Orquestar en la Raspberry Pi una pasarela LoRaWAN con concentrador SPI, integrando el servidor ChirpStack, el intermediario MQTT (Mosquitto) y un servicio puente en Python para decodificar las tramas e indexar las mediciones en una base de datos relacional PostgreSQL.
+
+    \item \textbf{Visualización y automatización de la infraestructura:} Automatizar el arranque tolerante a fallos de todos los servicios del sistema mediante el gestor \texttt{systemd}, y diseñar cuadros de mando interactivos en Grafana con consultas SQL optimizadas para el seguimiento analítico de los cultivos.
+\end{itemize}
+
+\section{Organización de la memoria}
+La presente memoria se estructura en los siguientes capítulos:
+\begin{itemize}
+    \item \textbf{Capítulo 2 (Estado del arte):} Examina las tecnologías de comunicación LPWAN (LoRaWAN, NB-IoT y Sigfox), analiza los protocolos de buses industriales en entornos agrícolas y revisa las principales soluciones comerciales disponibles.
+    \item \textbf{Capítulo 3 (Requisitos, especificaciones, coste, riesgos y viabilidad):} Detalla los requisitos funcionales y no funcionales del sistema, el presupuesto económico estimado, la matriz de riesgos y la viabilidad técnica y operativa.
+    \item \textbf{Capítulo 4 (Análisis):} Modela los casos de uso, la arquitectura de flujo de datos extremo a extremo (\textit{end-to-end}) y la estrategia energética del ciclo de vida del dispositivo.
+    \item \textbf{Capítulo 5 (Diseño):} Describe la arquitectura de hardware y software, la estructura binaria de las tramas de comunicación y el modelo entidad-relación de la base de datos.
+    \item \textbf{Capítulo 6 (Implementación y pruebas):} Expone el desarrollo del prototipo físico, la configuración de los servicios en la pasarela, la construcción del panel en Grafana y los resultados de las pruebas funcionales, de cobertura y de consumo energético.
+    \item \textbf{Capítulo 7 (Conclusiones y trabajo futuro):} Resume los logros alcanzados, discute las limitaciones identificadas y plantea posibles líneas de evolución y trabajo futuro.
+\end{itemize}

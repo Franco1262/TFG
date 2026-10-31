@@ -1,0 +1,226 @@
+% ==============================================================================
+% CAPÍTULO 3: REQUISITOS, ESPECIFICACIONES, COSTE, RIESGOS Y VIABILIDAD
+% Archivo: tex/requisitos.tex
+% ==============================================================================
+
+\section{Requisitos}
+
+El diseño del sistema integral de monitorización edafológica parte de la definición formal de los requisitos funcionales y no funcionales que debe satisfacer la solución en sus diferentes capas: sensado y nodo embebido, canal de comunicaciones y plataforma de ingesta y visualización.
+
+\subsection{Requisitos funcionales}
+Los requisitos funcionales delimitan las operaciones y comportamientos activos del sistema:
+
+\begin{itemize}
+    \item \textbf{RF-01 (Adquisición fisicoquímica multivariable):} El nodo sensor debe interrogar periódicamente la sonda edafológica para obtener de forma síncrona ocho variables del sustrato: temperatura, humedad volumétrica, conductividad eléctrica, potencial de hidrógeno (pH) y concentraciones de macronutrientes (nitrógeno, fósforo y potasio).
+    \item \textbf{RF-02 (Supervisión del suministro energético):} Antes de iniciar cada ciclo de muestreo, el firmware consulta el porcentaje de batería reportado por la PMU. Si el valor es válido y está por debajo de \texttt{CRITICAL\_LEVEL} (10\,\%), el sistema debe abortar el ciclo y volver a suspensión profunda para prevenir una descarga excesiva.
+    \item \textbf{RF-03 (Sincronización horaria absoluta):} El sistema debe contrastar periódicamente la hora de su reloj de tiempo real (RTC) frente a una fuente de referencia temporal absoluta (módem satelital GNSS) para corregir desviaciones térmicas y garantizar la coherencia cronológica de las series temporales.
+    \item \textbf{RF-04 (Almacenamiento transitorio de bajo consumo):} Las muestras adquiridas deben consolidarse inicialmente en una estructura circular retenida en la memoria RTC Slow RAM, permitiendo su acumulación entre ciclos de suspensión sin someter a desgaste medios de almacenamiento no volátiles.
+    \item \textbf{RF-05 (Transmisión inalámbrica agrupada por lotes):} El dispositivo debe evaluar dinámicamente si el volumen de muestras acumuladas justifica el encendido del módulo de radio LoRa, procediendo a su emisión conjunta (\textit{batching}) en tramas binarias compactas que optimicen el tiempo en el aire.
+    \item \textbf{RF-06 (Histórico en tarjeta microSD y gestión acotada del búfer):} El firmware debe registrar una sola vez en un archivo de auditoría por fecha, en formato JSON Lines (\texttt{.jsonl}), cada lote transmitido correctamente o que haya agotado sus dos intentos de envío, generando una entrada por muestra. Tras el primer fallo, el lote debe conservarse en el búfer RTC y marcarse como pendiente de reintento mediante un estado retenido durante el \textit{Deep Sleep}; una referencia estable y el número de muestras deben identificarlo para no descartar muestras nuevas ni duplicar entradas en el histórico. Tras el éxito o el segundo fallo, solo se descartarán las muestras de ese lote. Si falla la escritura en SD, se notificará explícitamente el error y se descartará igualmente el lote para mantener acotado el búfer, aceptando la posible pérdida del registro. La SD es un histórico, no una cola de reenvío.
+    \item \textbf{RF-07 (Ingesta desatendida y persistencia relacional):} La pasarela receptora debe interceptar los paquetes emitidos, decodificar el formato binario recibido, y almacenar las lecturas atomizadas en un motor de base de datos relacional con marcas temporales explícitas.
+    \item \textbf{RF-08 (Visualización y análisis analítico):} La plataforma debe proporcionar cuadros de mando web interactivos que grafiquen la evolución temporal de las variables fisicoquímicas, el estado nutricional NPK y el nivel de batería de los nodos en campo.
+\end{itemize}
+
+\subsection{Requisitos no funcionales}
+Los requisitos no funcionales definen los atributos de calidad, rendimiento y restricciones operativas del sistema:
+
+\begin{itemize}
+    \item \textbf{RNF-01 (Autonomía y eficiencia energética):} La corriente residual de reposo durante el estado de suspensión profunda (\textit{Deep Sleep}) no debe superar el orden de los microamperios, asegurando una operatividad desatendida superior a seis meses con una celda estándar de litio en ausencia de radiación solar.
+    \item \textbf{RNF-02 (Alcance del enlace radioeléctrico):} El subsistema de radioenlace debe garantizar una comunicación estable a distancias de al menos 2\,km en escenarios rurales con línea de vista (\textit{Line-of-Sight}, LoS) y atenuación moderada por follaje.
+    \item \textbf{RNF-03 (Cumplimiento normativo del espectro):} La transmisión en la banda ISM EU868 debe acatar estrictamente la restricción del ciclo de trabajo (\textit{Duty Cycle}) inferior al 1\,\% impuesta por la reglamentación europea para la sub-banda de 868,0 a 868,6\,MHz.
+    \item \textbf{RNF-04 (Inmunidad al ruido electromagnético industrial):} La interconexión física entre el nodo sensor y la sonda debe soportar tiradas de cableado en campo expuestas a ruidos industriales generados por bombas de riego y electroválvulas sin corromper la trama digital.
+    \item \textbf{RNF-05 (Tiempo de respuesta de consultas en el backend):} El almacenamiento relacional en la pasarela debe estructurarse mediante índices de base de datos específicos, asegurando que las consultas de series temporales desde el panel de visualización se completen en tiempos inferiores a 250\,ms para intervalos históricos extensos.
+    \item \textbf{RNF-06 (Recuperabilidad automática del sistema receptor):} Tras un corte imprevisto y posterior reanudación en el suministro eléctrico de la pasarela, todos los servicios de recepción, decodificación, base de datos y paneles de visualización deben restablecer su operación de forma autónoma sin intervención humana.
+\end{itemize}
+
+
+\section{Especificaciones}
+
+A partir de los requisitos establecidos, se derivan las especificaciones técnicas concretas que definen el dimensionamiento físico, electrónico y lógico del sistema.
+
+\subsection{Especificaciones del nodo sensor y subsistemas electrónicos}
+\begin{itemize}
+    \item \textbf{Unidad de control y procesamiento (MCU):} Placa LilyGO T-SIM7080G-S3 gobernada por el SoC Espressif ESP32-S3 (arquitectura Xtensa LX7 de doble núcleo a 240\,MHz). Integra 16\,MB de memoria Flash Quad-SPI, 8\,MB de PSRAM externa conectada por bus SPI, 512\,KB de SRAM interna y 8\,KB de RTC Slow RAM para retención de variables estáticas durante el estado de suspensión profunda (\textit{Deep Sleep}).
+    
+    \item \textbf{Unidad de gestión de potencia (PMU AXP2101):} Controlable mediante un bus dedicado I$^2$C (\texttt{SDA = GPIO 10}, \texttt{SCL = GPIO 11}) con línea de interrupción hardware (\texttt{GPIO 21}). Permite conmutar dinámicamente los carriles de regulación LDO y DC-DC (aislando el transceptor LoRa, la tarjeta de memoria y el bus RS-485 durante la suspensión), además de supervisar el nivel porcentual y la tensión de la celda de litio mediante su convertidor analógico-digital (ADC) integrado.
+    
+    \item \textbf{Alimentación y recolección fotovoltaica:} Conectores JST-PH dedicados para batería recargable de iones de litio de 3,7\,V y entrada de panel solar (rango admisible de 4,4\,V a 6,0\,V), gestionada por el circuito de recarga lineal configurable del PMU AXP2101.
+    
+    \item \textbf{Módem satelital y celular SIM7080G:} Módulo multirradio (LGA 77 pines) conectado al microcontrolador a través de un puerto UARTserie dedicado (\texttt{TX = GPIO 4}, \texttt{RX = GPIO 5}) y línea de ignición por pulsos (\texttt{PWRKEY = GPIO 41}). Su receptor GNSS integrado se excita de forma transitoria mediante comandos AT normalizados (\texttt{AT+CGNSPWR=1} y \texttt{AT+CGNSINF}) exclusivamente para corregir la deriva horaria (\textit{drift}) del oscilador RTC.
+    
+    \item \textbf{Almacenamiento no volátil local (TF Card):} Zócalo para tarjetas microSD acoplado al controlador periférico SD-MMC nativo en modo de un bit (\texttt{CLK = GPIO 39}, \texttt{CMD = GPIO 38}, \texttt{D0 = GPIO 40}). Este esquema minimiza el consumo de líneas de entrada/salida y permite velocidades de transferencia de hasta 40\,MHz bajo formato de archivos FAT32.
+    
+    \item \textbf{Transceptor de comunicaciones LoRa:} Módulo de radiofrecuencia Semtech SX1276 operando en la banda regional europea EU868 (868,1\,MHz a 868,5\,MHz), acoplado mediante bus SPI de cuatro líneas (MOSI, MISO, SCK, NSS) junto a pines de control e interrupción por hardware (DIO0/DIO1 y Reset).
+    
+    \item \textbf{Acondicionamiento y bus industrial de campo:} Transceptor diferencial semi-dúplex RS-485 (MAX485 / SP3485) conectado a una UART por hardware del ESP32-S3 y dotado de línea lógica de sentido de transmisión/recepción (\texttt{DE/RE}). Opera a 9600 bps, 8 bits de datos, sin paridad y 1 bit de parada (8N1).
+    
+    \item \textbf{Protocolo de la sonda de suelo:} Implementación de maestro Modbus RTU mediante el código de función \texttt{0x03} (\textit{Read Holding Registers}). Permite interrogar en una única transacción atómica los ocho registros necesarios para capturar temperatura, humedad volumétrica, conductividad eléctrica, pH y concentraciones NPK.
+\end{itemize}
+
+\subsection{Especificaciones del protocolo LoRaWAN y formato de datos}
+\begin{itemize}
+    \item \textbf{Transceptor de radio:} Semtech SX1276 acoplado mediante bus SPI de cuatro hilos a frecuencias de la banda europea ISM EU868 (canales comprendidos entre 868,1\,MHz y 868,5\,MHz).
+    \item \textbf{Parámetros de modulación:} Modulación LoRa con ancho de banda nominal de 125\,kHz, factor de codificación (\textit{Coding Rate}) $4/5$ y factor de dispersión adaptativo entre SF7 (Data Rate 5, $DR5$) y SF12 (Data Rate 0, $DR0$).
+    \item \textbf{Activación y seguridad:} Procedimiento de activación por el aire (\textit{Over-The-Air Activation}, OTAA) basado en las claves raíz \texttt{DevEUI}, \texttt{AppEUI/JoinEUI} y \texttt{AppKey}. Derivación y preservación en memoria RTC de las claves de sesión \texttt{NwkSKey} y \texttt{AppSKey}, así como del contador ascendente de tramas (\texttt{FCntUp}).
+    \item \textbf{Estructura binaria de muestra (\texttt{struct Data}):} Formato binario fijo y empaquetado (\texttt{\_\_attribute\_\_((packed))}) de 19 bytes en ordenación de bytes de menor peso primero (\textit{Little-Endian}):
+    \begin{itemize}
+        \item \texttt{timestamp} (4 bytes, \texttt{uint32\_t}): Marca temporal Unix absoluta UTC en segundos.
+        \item \texttt{temperature} (2 bytes, \texttt{int16\_t}): Temperatura en grados centígrados (resolución $0{,}01$\,$^\circ$C).
+        \item \texttt{humidity} (2 bytes, \texttt{uint16\_t}): Humedad volumétrica porcentual (resolución $0{,}01$\,\%).
+        \item \texttt{conductivity} (2 bytes, \texttt{uint16\_t}): Conductividad eléctrica en $\mu$S/cm.
+        \item \texttt{ph} (2 bytes, \texttt{uint16\_t}): Potencial de hidrógeno multiplicado por 10 (resolución $0{,}1$).
+        \item \texttt{nitrogen} (2 bytes, \texttt{uint16\_t}): Concentración de nitrógeno en mg/kg.
+        \item \texttt{phosphorus} (2 bytes, \texttt{uint16\_t}): Concentración de fósforo en mg/kg.
+        \item \texttt{potassium} (2 bytes, \texttt{uint16\_t}): Concentración de potasio en mg/kg.
+        \item \texttt{battery} (1 byte, \texttt{uint8\_t}): Nivel de carga residual porcentual ($0$\,--\,$100$\,\%).
+    \end{itemize}
+\end{itemize}
+
+\subsection{Especificaciones de la estación de recepción y software}
+\begin{itemize}
+    \item \textbf{Pasarela receptora:} Computador monoplaca Raspberry Pi provisto de sistema operativo Raspberry Pi OS (Linux kernel 6.x) enlazado mediante bus SPI al concentrador LoRa multicanal basado en el chip receptor Semtech SX1302/SX1303.
+    \item \textbf{Núcleo de red LoRaWAN:} Servidor de red de código abierto ChirpStack v4, vinculado con el enrutador de paquetes (\textit{packet forwarder}) y el intermediario de mensajería Eclipse Mosquitto bajo el protocolo MQTT (puerto 1883).
+    \item \textbf{Servicio de ingesta y transformación:} Demonio desacoplado desarrollado en Python 3 que actúa como suscriptor MQTT del tema de eventos de subida (\texttt{application/+/device/+/event/up}).
+    \item \textbf{Persistencia relacional:} Motor de base de datos PostgreSQL v15+. Tabla \texttt{soil\_data} con soporte nativo para marcas temporales con huso horario (\texttt{TIMESTAMPTZ}) e indexación especializada mediante árboles B (\textit{B-Tree}) sobre el identificador de dispositivo (\texttt{device\_eui}) y la fecha (\texttt{recorded\_at DESC}).
+    \item \textbf{Plataforma de visualización:} Servidor Grafana v10+ ejecutado de forma local, consumiendo métricas directamente mediante consultas SQL estructuradas sobre el motor PostgreSQL.
+    \item \textbf{Gestor de servicios:} Todos los componentes software de la pasarela se configuran como unidades independientes de \texttt{systemd} con directivas de reinicio automático en caso de fallo (\texttt{Restart=always}).
+\end{itemize}
+
+
+\section{Costes}
+
+El análisis económico del proyecto abarca el desglose de los costes de adquisición de los componentes de hardware, los costes de desarrollo asociados a la dedicación del autor como graduado en ingeniería informática y los costes de las herramientas software utilizadas.
+
+\subsection{Costes de hardware y componentes físicos}
+En el Cuadro~\ref{tab:costes_hardware} se detalla el presupuesto correspondiente a los componentes físicos necesarios para construir el nodo sensor y la pasarela receptora.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{p{5.5cm} c r r}
+\hline
+\textbf{Elemento / Descripción} & \textbf{Cantidad} & \textbf{Precio unitario} & \textbf{Total sin IVA} \\ \hline
+\multicolumn{4}{l}{\textit{\textbf{Subtotal: Prototipo Nodo Sensor IoT}}} \\
+Placa LilyGO T-SIM7080G-S3 (ESP32-S3 + GNSS) & 1 & 42,00\,€ & 42,00\,€ \\
+Módulo transceptor LoRa SX1276 (868\,MHz) & 1 & 6,50\,€ & 6,50\,€ \\
+Transceptor y aislamiento RS-485 (MAX485/SP3485) & 1 & 2,50\,€ & 2,50\,€ \\
+Sonda industrial multivariable de suelo (NPK/pH/EC) & 1 & 48,00\,€ & 48,00\,€ \\
+Tarjeta microSD industrial SanDisk 16\,GB & 1 & 6,00\,€ & 6,00\,€ \\
+Batería de polímero de litio 3,7\,V (2000\,mAh) & 1 & 8,50\,€ & 8,50\,€ \\
+Fabricación de placa de circuito impreso (PCB) a medida & 1 & 5,00\,€ & 5,00\,€ \\ \hline
+\textbf{Subtotal Nodo Sensor} & & & \textbf{118,50\,€} \\ \hline
+\multicolumn{4}{l}{\textit{\textbf{Subtotal: Pasarela de Recepción (Gateway)}}} \\
+Raspberry Pi 4 Model B (4\,GB RAM) & 1 & 62,00\,€ & 62,00\,€ \\
+Concentrador LoRa HAT multicanal SPI (SX1302) & 1 & 85,00\,€ & 85,00\,€ \\
+Antena omnidireccional LoRa 868\,MHz (3\,dBi) & 1 & 9,50\,€ & 9,50\,€ \\
+Fuente de alimentación oficial USB-C 5V 3A & 1 & 10,00\,€ & 10,00\,€ \\
+Tarjeta microSD de alta velocidad 32\,GB & 1 & 7,50\,€ & 7,50\,€ \\ \hline
+\textbf{Subtotal Pasarela} & & & \textbf{174,00\,€} \\ \hline
+\textbf{Total Coste Hardware (Base imponible)} & & & \textbf{292,50\,€} \\
+IVA aplicable (21\,\%) & & & 61,43\,€ \\ \hline
+\textbf{Total Coste Hardware (Impuestos incluidos)} & & & \textbf{353,93\,€} \\ \hline
+\end{tabular}
+\caption{Presupuesto desglosado de adquisición de hardware en España.}
+\label{tab:costes_hardware}
+\end{table}
+
+\subsection{Costes de personal y desarrollo}
+La estimación del coste de personal se fundamenta en las horas de dedicación estipuladas para la elaboración de un Trabajo Fin de Grado de 12 créditos ECTS (equivalentes a 300 horas de trabajo formal), aplicando una tarifa horaria de referencia para un perfil de graduado novel en ingeniería informática (22,00\,€/hora). El desglose por fases de ingeniería se expone en el Cuadro~\ref{tab:costes_personal}.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{p{7.5cm} c r r}
+\hline
+\textbf{Fase del proyecto} & \textbf{Dedicación (h)} & \textbf{Tarifa/hora} & \textbf{Subtotal} \\ \hline
+Estudio preliminar, estado del arte y requisitos & 40 & 22,00\,€ & 880,00\,€ \\
+Diseño de la PCB y esquemáticos electrónicos (KiCad) & 35 & 22,00\,€ & 770,00\,€ \\
+Desarrollo del firmware en C++ (ESP32-S3 / PMU / LoRa) & 85 & 22,00\,€ & 1.870,00\,€ \\
+Despliegue del backend en Raspberry Pi (ChirpStack/DB/MQTT) & 45 & 22,00\,€ & 990,00\,€ \\
+Configuración de paneles analíticos en Grafana & 20 & 22,00\,€ & 440,00\,€ \\
+Pruebas funcionales de laboratorio, campo y consumo & 35 & 22,00\,€ & 770,00\,€ \\
+Redacción de la memoria técnica y preparación de defensa & 40 & 22,00\,€ & 880,00\,€ \\ \hline
+\textbf{Total dedicación y coste de personal} & \textbf{300} & & \textbf{6.600,00\,€} \\ \hline
+\multicolumn{4}{p{13.5cm}}{\footnotesize \textit{Nota:} La tarifa horaria aplicada (22,00\,€/h) corresponde al coste integral de imputación para un perfil de ingeniería junior en España. Engloba el salario base bruto según convenio TIC (~13,50\,€/h), cotizaciones a la Seguridad Social a cargo del empleador (~31\,\%) y costes indirectos de infraestructura y licencias.}
+\end{tabular}
+\caption{Costes de personal asociados a las fases de desarrollo.}
+\label{tab:costes_personal}
+\end{table}
+
+\subsection{Herramientas y licencias software}
+Todas las herramientas, librerías y programas empleados a lo largo del ciclo de vida del proyecto operan bajo licencias de código abierto (\textit{Open Source}) o licencias académicas libres:
+\begin{itemize}
+    \item \textbf{Entorno de desarrollo:} Visual Studio Code, PlatformIO Core (licencia Apache 2.0) y la suite de compilación GCC Xtensa.
+    \item \textbf{Diseño electrónico:} KiCad EDA v7 (licencia GNU GPL v3).
+    \item \textbf{Pila de comunicaciones e infraestructura:} ChirpStack Network Server v4 (licencia MIT), Eclipse Mosquitto (licencia EPL/EDL) y controladores de radio RadioLib (licencia MIT).
+    \item \textbf{Almacenamiento y presentación:} PostgreSQL Database Server (licencia PostgreSQL / BSD) y Grafana Community Edition (licencia AGPLv3).
+    \item \textbf{Documentación:} Distribución MiKTeX y herramientas de compilación LaTeX Workshop.
+\end{itemize}
+El coste imputable a licencias de software es, por tanto, de \textbf{0,00\,€}.
+
+\subsection{Resumen del presupuesto consolidado}
+En el Cuadro~\ref{tab:presupuesto_consolidado} se resume el coste total global para el desarrollo y prototipado del sistema.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{p{8cm} r}
+\hline
+\textbf{Concepto} & \textbf{Importe total} \\ \hline
+Hardware de prototipado (Nodo + Pasarela con IVA) & 353,93\,€ \\
+Costes de personal y desarrollo de ingeniería & 6.600,00\,€ \\
+Herramientas software y costes de licenciamiento & 0,00\,€ \\
+Costes indirectos y material fungible de taller (5\,\%) & 17,70\,€ \\ \hline
+\textbf{Presupuesto total del proyecto} & \textbf{6.971,63\,€} \\ \hline
+\end{tabular}
+\caption{Presupuesto consolidado del proyecto.}
+\label{tab:presupuesto_consolidado}
+\end{table}
+
+
+\section{Riesgos}
+
+Durante el diseño, montaje y despliegue del sistema concurren diversos riesgos técnicos, ambientales y operativos que pueden comprometer la integridad de los componentes o la continuidad de los datos. En el Cuadro~\ref{tab:matriz_riesgos} se clasifica cada contingencia identificada en función de su probabilidad de ocurrencia y su impacto sobre el sistema, acompañada de la estrategia de mitigación implementada.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{p{3.5cm} c c p{6.8cm}}
+\hline
+\textbf{Riesgo identificado} & \textbf{Prob.} & \textbf{Imp.} & \textbf{Estrategia de mitigación y contingencia} \\ \hline
+Caída de tensión (\textit{Brownout}) en picos de radio o módem & Media & Alta & Aislamiento secuencial de periféricos mediante el PMU AXP2101, incorporación de condensadores de desacoplo de tantalio en la PCB y verificación del nivel de batería antes de energizar cargas de alta corriente. \\ \hline
+Corrupción del sistema de ficheros de la tarjeta microSD & Media & Media & Empleo de buses SD-MMC nativos y apertura, escritura y cierre (\textit{flush}) inmediatos de descriptores de fichero sin mantenerlos abiertos entre ciclos de suspensión. Si falla el registro de un lote, se notifica el error y se descarta igualmente para mantener acotado el búfer, aceptando la pérdida de esa entrada del histórico. \\ \hline
+Pérdida temporal de enlace o caída de la pasarela LoRaWAN & Alta & Media & Cada lote dispone de un máximo de dos intentos. Tras el primero se conserva en RTC y se mantiene un indicador de reintento; tras un segundo fallo se registra en el histórico SD y se descarta únicamente ese lote, liberando espacio para nuevas muestras. Los lotes descartados no se retransmiten desde la SD. \\ \hline
+Deriva temporal intrínseca (\textit{drift}) del reloj RTC interno & Alta & Media & Rutina periódica de sincronización absoluta asistida por el módem satelital GNSS; el reloj interno se calibra diariamente con la hora UTC extraída de las sentencias satelitales. \\ \hline
+Incompatibilidad o ruido electromagnético en el bus RS-485 & Media & Alta & Uso de una línea física de par trenzado diferencial, resistencias de terminación de 120\,$\Omega$, transceptor industrial y control estricto de los tiempos de espera de la línea mediante los pines DE/RE. \\ \hline
+Pérdida de sesión de red LoRaWAN tras el despertar de \textit{Deep Sleep} & Alta & Alta & Preservación del contexto criptográfico (\texttt{NwkSKey}, \texttt{AppSKey}) y de los contadores ascendentes (\texttt{FCntUp}) en la memoria estática retenida mediante el atributo \texttt{RTC\_DATA\_ATTR}, impidiendo peticiones \textit{Join} repetitivas. \\ \hline
+Cortes de suministro eléctrico en la estación receptora & Media & Alta & Configuración de los servicios críticos (\textit{packet forwarder}, ChirpStack, MQTT, puente Python y base de datos) bajo directivas \texttt{systemd} con política de reinicio automático y verificación de integridad transaccional ACID en PostgreSQL. \\ \hline
+\end{tabular}
+\caption{Matriz de riesgos técnicos y medidas de mitigación.}
+\label{tab:matriz_riesgos}
+\end{table}
+
+
+\section{Viabilidad}
+
+La viabilidad del proyecto ha sido evaluada desde tres perspectivas complementarias: técnica, económica y operativa o medioambiental.
+
+\subsection{Viabilidad técnica}
+El proyecto es plenamente viable en el plano técnico gracias a la madurez de las tecnologías involucradas y a la compatibilidad del hardware seleccionado:
+\begin{itemize}
+    \item \textbf{Ecosistema embebido:} El microcontrolador ESP32-S3 dispone de un soporte robusto en compiladores de C/C++ y herramientas de depuración, permitiendo la interacción con periféricos complejos mediante buses SPI, I$^2$C, UART y SD-MMC sin conflictos de temporización.
+    \item \textbf{Pila de radio e interoperabilidad:} La especificación LoRaWAN regional EU868 y librerías abiertas consolidadas como RadioLib garantizan la correcta ejecución del protocolo de modulación, los mecanismos adaptativos de tasa de transferencia (ADR) y la persistencia de las claves de cifrado en la memoria de ultrabajo consumo.
+    \item \textbf{Infraestructura receptora consolidada:} La utilización de un concentrador multicanal estándar acoplado a un sistema operativo Linux en la Raspberry Pi permite el uso de motores de red (ChirpStack) y bases de datos relacionales (PostgreSQL) reconocidos por su estabilidad en producción industrial.
+\end{itemize}
+
+\subsection{Viabilidad económica}
+Frente a las alternativas comerciales del sector de la agricultura de precisión (cuyos precios por nodo suelen rebasar los 600\,--\,1.000\,€ y exigen contratos periódicos de software), la propuesta implementada en este trabajo demuestra una viabilidad económica superior:
+\begin{itemize}
+    \item \textbf{Coste de replicabilidad reducido:} Un nodo sensor completo, integrando su envolvente estanca, circuitería PMU, sonda NPK multivariable y placa PCB a medida, supone un coste de adquisición de hardware inferior a 120\,€.
+    \item \textbf{Ausencia de costes recurrentes:} La pasarela propia canaliza los datos por radiofrecuencia libre de licencias, sin cuotas a operadores de telefonía móvil por tarjetas SIM. A su vez, toda la pila backend se sustenta sobre software libre, eliminando suscripciones periódicas de almacenamiento en la nube.
+\end{itemize}
+
+\subsection{Viabilidad operativa y medioambiental}
+\begin{itemize}
+    \item \textbf{Adaptabilidad al entorno agrícola:} La combinación de una envolvente con protección IP67, la robustez diferencial del bus industrial RS-485 frente a perturbaciones electromagnéticas y la interfaz de recarga solar aseguran una operatividad continuada en condiciones climáticas desfavorables.
+    \item \textbf{Impacto agronómico positivo:} La toma continua de mediciones edafológicas (humedad y macronutrientes) capacita a los productores agrícolas para aplicar fertilizantes y dosificar el riego de forma racional, reduciendo el agotamiento de acuíferos y previniendo la degradación química del suelo.
+\end{itemize}

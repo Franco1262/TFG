@@ -1,0 +1,72 @@
+\babel@toc {spanish}{}\relax 
+\contentsline {chapter}{\numberline {1}Introducción}{19}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Introducción}{19}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Motivación}{20}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Objetivos}{21}{section.1.3}%
+\contentsline {section}{\numberline {1.4}Organización de la memoria}{22}{section.1.4}%
+\contentsline {chapter}{\numberline {2}Estado del arte}{25}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Análisis de aplicaciones similares}{25}{section.2.1}%
+\contentsline {section}{\numberline {2.2}Tecnologías}{26}{section.2.2}%
+\contentsline {subsection}{\numberline {2.2.1}Comunicaciones inalámbricas: LoRaWAN frente a alternativas LPWAN}{26}{subsection.2.2.1}%
+\contentsline {subsection}{\numberline {2.2.2}Plataforma de computación embebida y gestión de energía}{27}{subsection.2.2.2}%
+\contentsline {subsection}{\numberline {2.2.3}Instrumentación edáfica y bus de comunicaciones de campo}{28}{subsection.2.2.3}%
+\contentsline {subsection}{\numberline {2.2.4}Infraestructura receptora, persistencia y visualización}{28}{subsection.2.2.4}%
+\contentsline {chapter}{\numberline {3}Requisitos, especificaciones, coste, riesgos, viabilidad}{31}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Requisitos}{31}{section.3.1}%
+\contentsline {subsection}{\numberline {3.1.1}Requisitos funcionales}{31}{subsection.3.1.1}%
+\contentsline {subsection}{\numberline {3.1.2}Requisitos no funcionales}{32}{subsection.3.1.2}%
+\contentsline {section}{\numberline {3.2}Especificaciones}{33}{section.3.2}%
+\contentsline {subsection}{\numberline {3.2.1}Especificaciones del nodo sensor y subsistemas electrónicos}{33}{subsection.3.2.1}%
+\contentsline {subsection}{\numberline {3.2.2}Especificaciones del protocolo LoRaWAN y formato de datos}{34}{subsection.3.2.2}%
+\contentsline {subsection}{\numberline {3.2.3}Especificaciones de la estación de recepción y software}{35}{subsection.3.2.3}%
+\contentsline {section}{\numberline {3.3}Costes}{35}{section.3.3}%
+\contentsline {subsection}{\numberline {3.3.1}Costes de hardware y componentes físicos}{35}{subsection.3.3.1}%
+\contentsline {subsection}{\numberline {3.3.2}Costes de personal y desarrollo}{35}{subsection.3.3.2}%
+\contentsline {subsection}{\numberline {3.3.3}Herramientas y licencias software}{37}{subsection.3.3.3}%
+\contentsline {subsection}{\numberline {3.3.4}Resumen del presupuesto consolidado}{37}{subsection.3.3.4}%
+\contentsline {section}{\numberline {3.4}Riesgos}{38}{section.3.4}%
+\contentsline {section}{\numberline {3.5}Viabilidad}{38}{section.3.5}%
+\contentsline {subsection}{\numberline {3.5.1}Viabilidad técnica}{38}{subsection.3.5.1}%
+\contentsline {subsection}{\numberline {3.5.2}Viabilidad económica}{40}{subsection.3.5.2}%
+\contentsline {subsection}{\numberline {3.5.3}Viabilidad operativa y medioambiental}{40}{subsection.3.5.3}%
+\contentsline {chapter}{\numberline {4}Diseño}{41}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Arquitectura general del sistema}{41}{section.4.1}%
+\contentsline {subsection}{\numberline {4.1.1}Visión global y descomposición por capas}{41}{subsection.4.1.1}%
+\contentsline {subsection}{\numberline {4.1.2}Flujo de datos y ciclo de vida de la información}{43}{subsection.4.1.2}%
+\contentsline {subsection}{\numberline {4.1.3}Diagrama de despliegue}{44}{subsection.4.1.3}%
+\contentsline {section}{\numberline {4.2}Diseño hardware del nodo sensor}{45}{section.4.2}%
+\contentsline {subsection}{\numberline {4.2.1}Composición e integración de subsistemas}{45}{subsection.4.2.1}%
+\contentsline {subsection}{\numberline {4.2.2}Placa de interconexión y acondicionamiento (Carrier HAT)}{46}{subsection.4.2.2}%
+\contentsline {subsubsection}{Mecanismo de acoplamiento físico y apilamiento (Stacking)}{47}{section*.2}%
+\contentsline {subsection}{\numberline {4.2.3}Etapa de alimentación y gestión de potencia}{48}{subsection.4.2.3}%
+\contentsline {subsection}{\numberline {4.2.4}Acondicionamiento del bus de campo RS-485}{48}{subsection.4.2.4}%
+\contentsline {subsection}{\numberline {4.2.5}Diseño y ruteo de la placa de circuito impreso (PCB)}{49}{subsection.4.2.5}%
+\contentsline {section}{\numberline {4.3}Diseño del software embebido (Firmware)}{50}{section.4.3}%
+\contentsline {subsection}{\numberline {4.3.1}Ciclo de vida y máquina de estados del nodo}{50}{subsection.4.3.1}%
+\contentsline {subsection}{\numberline {4.3.2}Adquisición de campo y sincronización temporal}{51}{subsection.4.3.2}%
+\contentsline {subsection}{\numberline {4.3.3}Estructura de datos y persistencia multinivel}{51}{subsection.4.3.3}%
+\contentsline {subsection}{\numberline {4.3.4}Estrategia de transmisión por lotes (Batching) y sesión LoRaWAN}{52}{subsection.4.3.4}%
+\contentsline {section}{\numberline {4.4}Diseño de la infraestructura de red y comunicaciones}{53}{section.4.4}%
+\contentsline {subsection}{\numberline {4.4.1}Topología LoRaWAN y parámetros de modulación}{53}{subsection.4.4.1}%
+\contentsline {subsection}{\numberline {4.4.2}Preservación de sesión de red entre ciclos de reposo}{53}{subsection.4.4.2}%
+\contentsline {subsection}{\numberline {4.4.3}Diseño del protocolo de mensajería interna (MQTT)}{53}{subsection.4.4.3}%
+\contentsline {section}{\numberline {4.5}Diseño del backend y almacenamiento}{53}{section.4.5}%
+\contentsline {subsection}{\numberline {4.5.1}Arquitectura desacoplada de la estación receptora}{53}{subsection.4.5.1}%
+\contentsline {subsection}{\numberline {4.5.2}Diseño del servicio de ingesta y transformación}{53}{subsection.4.5.2}%
+\contentsline {subsection}{\numberline {4.5.3}Modelo relacional de datos}{53}{subsection.4.5.3}%
+\contentsline {subsection}{\numberline {4.5.4}Estrategia de indexación y optimización de consultas temporales}{53}{subsection.4.5.4}%
+\contentsline {section}{\numberline {4.6}Diseño de la plataforma de visualización}{53}{section.4.6}%
+\contentsline {subsection}{\numberline {4.6.1}Estructura de cuadros de mando en Grafana}{53}{subsection.4.6.1}%
+\contentsline {subsection}{\numberline {4.6.2}Diseño de consultas analíticas y alertas}{53}{subsection.4.6.2}%
+\contentsline {chapter}{\numberline {5}Implementación y pruebas}{55}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Implementación}{55}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Pruebas funcionales}{55}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Pruebas de rendimiento}{55}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Pruebas de usabilidad}{55}{section.5.4}%
+\contentsline {chapter}{\numberline {6}Conclusiones}{57}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Revisión de costes}{57}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Conclusiones}{57}{section.6.2}%
+\contentsline {section}{\numberline {6.3}Trabajo futuro}{57}{section.6.3}%
+\contentsline {chapter}{\numberline {A}Apéndice}{59}{appendix.A}%
+\contentsline {section}{\numberline {A.1}Ejemplos del lenguaje de marcado Latex}{59}{appendix.A.1}%
+\contentsline {chapter}{Bibliografía}{60}{lstnumber.-2.4}%

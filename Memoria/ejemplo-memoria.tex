@@ -1,0 +1,103 @@
+\documentclass[twoside,spanish,a4paper,12pt]{tfg}
+
+% Editar la titulación
+\titulacion{Grado en Ingeniería Informática}
+
+% Editar el título
+\title{Implementación de nodo IoT basado en comunicaciones LoRa para monitorización de parámetros de calidad del suelo}
+
+% Etiqueta y nombre del autor
+\authorlabel{Autor}
+\author{Franco Gastón Calascione González}
+
+% Etiqueta y nombre del tutor
+\tutorlabel{Tutor}
+\tutor{Juan José Pérez Solano}
+
+% Convocatoria de lectura del TFG (pendiente de definir mes/año)
+\convocatoria{Convocatoria}
+
+\begin{document}
+
+% NO QUITAR ESTOS ELEMENTOS
+\portada
+\cleardoublepage
+\contraportada
+\cleardoublepage
+\declaracion
+\cleardoublepage
+
+
+% Resumen en Español
+\begin{resumen}
+Este Trabajo Fin de Grado aborda el diseño y desarrollo de un nodo sensorial IoT de ultra bajo consumo orientado a la monitorización continua y adquisición de parámetros fisicoquímicos en suelos agrícolas. El sistema se fundamenta en un microcontrolador ESP32-S3 interconectado mediante bus industrial RS-485 (Modbus RTU) a una sonda NPK multivariable (temperatura, humedad, pH, conductividad eléctrica y macronutrientes). Para maximizar la autonomía energética del dispositivo, la arquitectura implementa ciclos de suspensión profunda (\textit{Deep Sleep}), persistencia de mediciones en memoria RTC Slow RAM, sincronización temporal periódica mediante GNSS y almacenamiento local de respaldo en tarjeta micro-SD en formato JSON Lines. La transmisión inalámbrica de las lecturas se efectúa por lotes a través de una red LoRaWAN (OTAA) hacia una pasarela (\textit{gateway}) desplegada en una Raspberry Pi, permitiendo la recolección, ingesta de datos y su posterior monitorización y análisis mediante cuadros de mando en Grafana.
+\end{resumen}
+\cleardoublepage
+
+% Resumen en Inglés
+\begin{abstract}
+This Bachelor's Thesis presents the design and development of an ultra-low-power IoT sensor node aimed at continuous monitoring and acquisition of physicochemical parameters in agricultural soils. The system is built around an ESP32-S3 microcontroller interfaced via an industrial RS-485 bus (Modbus RTU) to a multivariable NPK probe (measuring temperature, humidity, pH, electrical conductivity, and macronutrients). To maximize energy autonomy, the architecture implements deep sleep cycles, measurement persistence in RTC Slow RAM, periodic GNSS-based time synchronization, and local fallback storage on a micro-SD card in JSON Lines format. Wireless transmission of the gathered metrics is carried out in batches over a LoRaWAN network (OTAA) to a gateway deployed on a Raspberry Pi, enabling data ingestion, persistence, and subsequent visualization and analysis through Grafana dashboards.
+\end{abstract}
+\cleardoublepage
+
+% Resumen en Valenciano
+\begin{resum}
+Aquest Treball Fi de Grau aborda el disseny i desenvolupament d'un node sensorial IoT d'ultra baix consum orientat a la monitorització contínua i adquisició de paràmetres fisicoquímics en sòls agrícoles. El sistema es fonamenta en un microcontrolador ESP32-S3 interconnectat mitjançant bus industrial RS-485 (Modbus RTU) a una sonda NPK multivariable (temperatura, humitat, pH, conductivitat elèctrica i macronutrients). Per tal de maximitzar l'autonomia energètica del dispositiu, l'arquitectura implementa cicles de suspensió profunda (\textit{Deep Sleep}), persistència de mesuraments en memòria RTC Slow RAM, sincronització temporal periòdica mitjançant GNSS i emmagatzematge local de suport en targeta micro-SD en format JSON Lines. La transmissió sense fils de les lectures s'efectua per lots a través d'una xarxa LoRaWAN (OTAA) cap a una passarel·la (\textit{gateway}) desplegada en una Raspberry Pi, permetent la recol·lecció, ingesta de dades i la seua posterior monitorització i anàlisi mitjançant quadres de comandament en Grafana.
+\end{resum}
+\cleardoublepage
+
+
+% Agradecimientos (opcional)
+\begin{agradecimientos}
+% Espacio reservado para los agradecimientos.
+\end{agradecimientos}
+\cleardoublepage
+
+\tableofcontents
+
+\pagestyle{tfg}
+\justify
+
+% Las figuras se buscan en el directorio figs
+
+% Cada capítulo está en su propio fichero tex. Ver el directorio tex.
+
+% La bibliografía está dentro del directorio bib
+\chapter{Introducción}
+\input{tex/introduccion.tex}
+
+\chapter{Estado del arte}
+\input{tex/estado_arte.tex}
+
+\chapter{Requisitos, especificaciones, coste, riesgos, viabilidad}
+\input{tex/requisitos.tex}
+
+\chapter{Diseño}
+\input{tex/diseno.tex}
+
+\chapter{Implementación y pruebas}
+\input{tex/implementacion_pruebas.tex}
+\chapter{Conclusiones}
+\input{tex/conclusiones.tex}
+
+
+
+\pagestyle{appendix}
+
+\appendix
+\chapter{Apéndice}
+\input{tex/apendice.tex}
+
+\addcontentsline{toc}{chapter}{Bibliografía}
+\bibliographystyle{unsrt}
+\bibliography{bib/bibliografia}
+
+
+
+
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:
