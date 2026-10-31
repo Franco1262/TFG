@@ -13,10 +13,13 @@ time_t Clock::getGpsTime()
     time_t unix_time = 0;
 
     Power::enableModemPower();
-    if (!Modem::turnOn())
+    if (!Modem::turnOn() || !Modem::enableGps())
+    {
+        Modem::disableGps();
+        Modem::turnOff();
+        Power::disableModemPower();
         return unix_time;
-    if (!Modem::enableGps())
-        return unix_time;
+    }
 
     unsigned long last_poll = millis() - POLL_INTERVAL;
     bool time_fixed = false;

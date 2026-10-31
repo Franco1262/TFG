@@ -18,9 +18,9 @@ static constexpr int MAX_ABSOLUTE_BATCH_SIZE = 256;
 
 //Pins for handling communication with RS485 module
 //TODO: find new pins for these
-static constexpr int RS485_RXD = 1;
-static constexpr int RS485_TXD = 2;
-static constexpr int RS485_DIR1 = 3;
+static constexpr int RS485_RXD = 12;
+static constexpr int RS485_TXD = 14;
+static constexpr int RS485_DIR1 = 13;
 
 //Pins for handling communications between LoRa Module and ESP32
 static constexpr int LORA_SCK = 11;

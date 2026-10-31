@@ -1,4 +1,5 @@
 #include "SD.h"
+#include "driver/gpio.h"
 
 
 void SD::powerOn()
@@ -50,5 +51,8 @@ bool SD::logBatch(const CircularBuffer<Data, MAX_ABSOLUTE_BATCH_SIZE>& buffer, u
 void SD::shutdown()
 {
     SD_MMC.end();
+    gpio_reset_pin((gpio_num_t)SDMMC_CLK);
+    gpio_reset_pin((gpio_num_t)SDMMC_CMD);
+    gpio_reset_pin((gpio_num_t)SDMMC_DATA);
     Power::disableSDCardPower();
 }

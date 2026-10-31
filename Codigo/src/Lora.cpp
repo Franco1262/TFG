@@ -53,7 +53,8 @@ bool Lora::turnOn()
     if(state < RADIOLIB_ERR_NONE) 
     {
         DEBUG_PRINTLN("Radio init failed: ");
-        DEBUG_PRINTLN(state);    
+        DEBUG_PRINTLN(state);
+        turnOff();
         return false; 
     }
     
