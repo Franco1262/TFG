@@ -14,4 +14,6 @@ The compiler is selected through --compiler, CXX, g++ in PATH, or the usual
 Windows PlatformIO Xtensa compiler location. Python standard library only.
 
 These checks do not validate actual radio transmission, physical RTC retention,
-SD write integrity, GNSS, power consumption or the soil sensor.
+SD write integrity, GNSS, power consumption or the soil sensor. A source-level
+guard checks that SD::logBatch rejects short writes before counting a line; it
+does not simulate filesystem errors, partial card writes or power loss.

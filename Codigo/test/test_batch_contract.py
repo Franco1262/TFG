@@ -22,6 +22,22 @@ def main():
     if not compiler:
         compiler = str(Path.home() / ".platformio/packages/toolchain-xtensa-esp32s3/bin/xtensa-esp32s3-elf-g++.exe")
     source = (project / "src/main.cpp").read_text(encoding="utf-8")
+    sd_source = (project / "src/SD.cpp").read_text(encoding="utf-8")
+    sd_match = re.search(r"bool SD::logBatch\(.*?\n\}", sd_source, re.S)
+    if not sd_match:
+        raise RuntimeError("Cannot find SD::logBatch in SD.cpp")
+    sd_body = sd_match.group()
+    write_check = re.search(
+        r"file\.write\(reinterpret_cast<const uint8_t\*>\(json_buffer\), line_length\) != line_length",
+        sd_body,
+    )
+    written_increment = sd_body.find("written++")
+    if not write_check or written_increment < write_check.end():
+        raise RuntimeError("SD::logBatch must reject a partial line before counting it as written")
+    if "json_length < 0" not in sd_body or not re.search(
+        r"json_length\)\s*>=\s*sizeof\(json_buffer\)\s*-\s*1", sd_body
+    ):
+        raise RuntimeError("SD::logBatch must reject formatting errors and truncated JSON lines")
     types = (project / "include/types.h").read_text(encoding="utf-8")
     types = re.sub(r"^\s*#.*$", "", types, flags=re.M)
     buffer = (project / "include/CircularBuffer.h").read_text(encoding="utf-8")
@@ -321,7 +337,9 @@ static_assert(remainderGetsNewBudget(), "Remainder starts a new lot");
     if completed.returncode:
         raise SystemExit(completed.stdout + completed.stderr)
     print(f"PASS: {tests.count('static_assert(')} compile-time assertions on real batch-flow code with simulated hardware")
+    print("PASS: SD::logBatch rejects partial writes and truncated JSON before counting a line")
     print("The buffer and flow are made constexpr only in this test copy; production code is unchanged.")
+    print("The SD assertion checks source ordering only; it does not simulate card I/O or power loss.")
     print("This does not validate radio hardware, SD writes or physical RTC retention.")
 
 

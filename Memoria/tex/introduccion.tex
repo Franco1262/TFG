@@ -40,22 +40,22 @@ la activación del transceptor LoRa SX1276 para proceder a su transmisión agrup
 por lotes (\textit{batching}) en una única trama LoRaWAN activada por OTAA. 
 
 Asimismo, la arquitectura contempla persistencia local en la tarjeta microSD (bus SD-MMC).
-El protocolo de envío agrupa las muestras del búfer RTC en lotes y limita a dos los intentos de
-transmisión de cada lote. Si falla el primer intento, el lote permanece en el búfer y su identidad,
-número de muestras e intentos consumidos se conservan en \texttt{pending\_batch} durante la suspensión profunda.
-Si en el segundo intento cabe menos información, se intenta enviar el prefijo que quepa y el excedente
-se conserva para un lote nuevo, con su propio presupuesto de dos intentos. El prefijo se registra en el
-histórico de auditoría JSON Lines (\texttt{.jsonl}) y se descarta tanto si tiene éxito como si agota el
-segundo intento. Si ese segundo intento no puede enviar ninguna muestra por fallo de radio, sesión o
-capacidad nula, se registra y descarta el lote pendiente completo. Se considera éxito la transmisión
-local sin error, no la confirmación de recepción por la pasarela. Cada conjunto finalizado se
-registra una sola vez para evitar duplicados. Los errores de
-escritura en SD se notifican explícitamente, pero el lote se descarta igualmente para mantener acotado
-el búfer, aceptando la posible pérdida de ese registro. La SD actúa como histórico y no como cola de
-reenvío: los lotes descartados tras dos fallos no se retransmiten. El estado RTC identifica el lote
-pendiente, de modo que las muestras nuevas que se adquieran durante los reintentos no se descarten
-junto con él. El registro JSON Lines incluye una entrada por muestra del lote. La memoria RTC conserva
-las lecturas durante la suspensión profunda mientras permanezca alimentado el dominio RTC.
+El protocolo de envío agrupa las muestras del búfer RTC en conjuntos pendientes y limita a dos los
+intentos de cada conjunto. Si falla el primero, su identidad, tamaño e intentos consumidos se conservan
+en \texttt{pending\_batch} durante la suspensión profunda. Si en el segundo intento cabe menos, se
+intenta enviar el prefijo que quepa y el excedente se conserva para un lote nuevo, con dos intentos
+propios. El prefijo se registra y descarta tanto si la transmisión local termina sin error como si agota
+sus dos intentos. Si el segundo intento no puede enviar ninguna muestra por fallo de radio, sesión o
+capacidad nula, se registra y descarta el conjunto pendiente completo. El éxito local no confirma la
+recepción por la pasarela. Durante el flujo normal entre ciclos, cada conjunto finalizado se registra una
+sola vez; no existe garantía de atomicidad entre SD y RTC ante un corte durante la finalización. Una
+escritura parcial se detecta comparando los bytes informados con la longitud solicitada, pero puede dejar
+una última línea JSON incompleta. La interfaz usada no permite truncar ese fragmento atómicamente y el
+lector debe rechazar líneas incompletas. Si falla SD, el conjunto finalizado se descarta igualmente,
+aceptando la posible pérdida o truncamiento del registro. La SD actúa como histórico, no como cola de
+reenvío. El estado RTC distingue el conjunto
+pendiente de las muestras nuevas. La retención del búfer solo se mantiene mientras el dominio RTC esté
+alimentado.
 
 Por último, la infraestructura de recepción se despliega sobre una Raspberry Pi equipada con un concentrador 
 LoRa multicanal comunicado por SPI. Mediante la orquestación de servicios desatendidos administrados por el gestor 
@@ -76,7 +76,7 @@ La motivación de este proyecto responde a los desafíos operativos, energético
 
     \item \textbf{Optimización del canal radioeléctrico y normativa LPWAN:} El envío indiscriminado de lecturas individuales compromete la batería y colisiona con las severas restricciones de ciclo de trabajo (\textit{duty cycle}) y tiempo en el aire (\textit{airtime}) de la banda europea EU868. El diseño exige implementar estrategias de transmisión agrupada por lotes (\textit{batching}) con cálculo dinámico de carga útil, maximizando el rendimiento del espectro radioeléctrico y minimizando los encendidos del transceptor.
 
-    \item \textbf{Tolerancia a fallos y resiliencia temporal:} En despliegues remotos, la desincronización horaria o la pérdida de enlace no deben derivar en registros inválidos. La deriva inherente al oscilador RTC del microcontrolador exige una corrección periódica mediante sincronización satelital GNSS. Ante fallos de radio, cada lote dispone de un máximo de dos intentos: tras el primero se conserva en la memoria RTC Slow RAM, y tras el segundo se registra en el histórico JSON Lines de la tarjeta microSD y se descarta para liberar espacio. La SD no funciona como cola de reenvío; si falla el registro, se notifica el error y se descarta igualmente el lote, aceptando una posible pérdida del histórico.
+    \item \textbf{Tolerancia a fallos y resiliencia temporal:} Si no se obtiene sincronización GNSS válida, el nodo continúa usando el reloj del ESP32, sin garantizar que marque UTC real. Ante fallos de radio, cada conjunto pendiente dispone de dos intentos. Si la capacidad disminuye en el segundo, se finaliza solo el prefijo intentado y el excedente pasa a un lote nuevo. La SD es un histórico, no una cola de reenvío; un fallo de escritura se notifica y se acepta la posible pérdida o truncamiento del registro.
 
     \item \textbf{Operación desatendida en la infraestructura de recepción:} La pasarela receptora desplegada en campo debe operar como un dispositivo autónomo (\textit{appliance}), capaz de levantar la pila de comunicaciones (servidor de red, intermediario MQTT, pasarela LoRa) y la persistencia en base de datos de manera automática tras cortes imprevistos en el suministro eléctrico, sin requerir supervisión por consola.
 
@@ -96,7 +96,7 @@ Para la consecución de esta meta global, se definen los siguientes \textbf{obje
 
     \item \textbf{Optimización de radio LoRaWAN y transmisión por lotes:} Implementar la pila LoRaWAN sobre la banda EU868 con activación OTAA, incorporando un algoritmo de cálculo dinámico del tamaño máximo de carga útil para agrupar lecturas en lotes (\textit{batching}) en una estructura binaria compacta de 19 bytes, y preservando el estado de la sesión de red en memoria RTC para evitar renegociaciones tras cada suspensión.
 
-    \item \textbf{Gestión acotada del búfer y tolerancia a fallos:} Mantener las muestras en un búfer circular en la memoria RTC Slow RAM y agruparlas en lotes para su transmisión. Conservar en RTC la referencia de la muestra más antigua, el número de muestras y los intentos consumidos. Tras el primer fallo se conserva el lote; tras éxito o segundo fallo se registra y descarta el conjunto finalizado. Si en el segundo intento solo cabe un prefijo, el excedente pasa a un lote nuevo sin ser registrado ni descartado todavía. Si no puede enviarse ninguna muestra en el segundo intento, se finaliza el lote pendiente completo. Los errores de SD se notifican y no impiden liberar el conjunto finalizado. La SD no actúa como cola de reenvío.
+    \item \textbf{Gestión acotada del búfer y tolerancia a fallos:} Conservar en RTC un contador de cabecera, tamaño e intentos de cada conjunto pendiente. Tras el primer fallo se conserva; tras el éxito local o el segundo intento se registra y descarta solo el conjunto finalizado. Si en el segundo intento solo cabe un prefijo, el excedente pasa a un lote nuevo sin registro ni descarte prematuros. Si no puede enviarse ninguna muestra, se finaliza el conjunto completo. Los errores SD se notifican y no impiden liberar el conjunto finalizado. La SD no es cola de reenvío; la unicidad se limita al flujo normal y no es atómica ante un corte entre escritura y actualización de RTC.
 
     \item \textbf{Despliegue del backend receptor y persistencia de series temporales:} Orquestar en la Raspberry Pi una pasarela LoRaWAN con concentrador SPI, integrando el servidor ChirpStack, el intermediario MQTT (Mosquitto) y un servicio puente en Python para decodificar las tramas e indexar las mediciones en una base de datos relacional PostgreSQL.
 
@@ -108,8 +108,7 @@ La presente memoria se estructura en los siguientes capítulos:
 \begin{itemize}
     \item \textbf{Capítulo 2 (Estado del arte):} Examina las tecnologías de comunicación LPWAN (LoRaWAN, NB-IoT y Sigfox), analiza los protocolos de buses industriales en entornos agrícolas y revisa las principales soluciones comerciales disponibles.
     \item \textbf{Capítulo 3 (Requisitos, especificaciones, coste, riesgos y viabilidad):} Detalla los requisitos funcionales y no funcionales del sistema, el presupuesto económico estimado, la matriz de riesgos y la viabilidad técnica y operativa.
-    \item \textbf{Capítulo 4 (Análisis):} Modela los casos de uso, la arquitectura de flujo de datos extremo a extremo (\textit{end-to-end}) y la estrategia energética del ciclo de vida del dispositivo.
-    \item \textbf{Capítulo 5 (Diseño):} Describe la arquitectura de hardware y software, la estructura binaria de las tramas de comunicación y el modelo entidad-relación de la base de datos.
-    \item \textbf{Capítulo 6 (Implementación y pruebas):} Expone el desarrollo del prototipo físico, la configuración de los servicios en la pasarela, la construcción del panel en Grafana y los resultados de las pruebas funcionales, de cobertura y de consumo energético.
-    \item \textbf{Capítulo 7 (Conclusiones y trabajo futuro):} Resume los logros alcanzados, discute las limitaciones identificadas y plantea posibles líneas de evolución y trabajo futuro.
+    \item \textbf{Capítulo 4 (Diseño):} Describe la arquitectura y el diseño previsto de los subsistemas.
+    \item \textbf{Capítulo 5 (Implementación y pruebas):} Expone la implementación y las pruebas efectivamente realizadas, distinguiendo lo implementado de lo diseñado o pendiente.
+    \item \textbf{Capítulo 6 (Conclusiones):} Resume los resultados respaldados por la implementación y las pruebas, las limitaciones y el trabajo futuro.
 \end{itemize}

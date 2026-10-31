@@ -12,7 +12,7 @@ En la última década, la digitalización agrícola y las técnicas de agricultu
     \item \textbf{Prototipos abiertos y proyectos DIY basados en microcontroladores básicos (Arduino, ESP8266):} En el ámbito académico y de código abierto proliferan desarrollos basados en placas de bajo coste asociadas a sondas resistivas simples. Aunque resultan económicos, adolecen de severas carencias para un despliegue operativo: las sondas resistivas sufren una rápida degradación por electrólisis, los microcontroladores carecen de memoria no volátil de bajo consumo retenida para gestionar estados de red y, al prescindir de circuitos dedicados de gestión de potencia (PMU), la autonomía de la batería raramente supera unas pocas semanas.
 \end{itemize}
 
-En la Cuadro~\ref{tab:comparativa_aplicaciones} se sintetizan las diferencias arquitectónicas y operativas entre las soluciones comerciales, los proyectos de prototipado estándar y la propuesta implementada en este trabajo.
+En el Cuadro~\ref{tab:comparativa_aplicaciones} se sintetizan las diferencias arquitectónicas y operativas entre las soluciones comerciales, los proyectos de prototipado estándar y la propuesta de este trabajo.
 
 \begin{table}[htbp]
 \centering
@@ -20,7 +20,7 @@ En la Cuadro~\ref{tab:comparativa_aplicaciones} se sintetizan las diferencias ar
 \begin{tabular}{p{3.8cm} p{3.6cm} p{3.4cm} p{4cm}}
 \hline
 \textbf{Criterio} & \textbf{Soluciones Comerciales} & \textbf{Proyectos DIY Básicos} & \textbf{Propuesta de este TFG} \\ \hline
-\textbf{Coste unitario por nodo} & Elevado ($>$ 600\,--\,1.500\,€) & Muy bajo ($<$ 30\,€) & Moderado / Accesible ($\sim$80\,--\,110\,€) \\
+\textbf{Coste unitario por nodo} & Elevado (600\,--\,1.500\,€) & Muy bajo ($<$ 30\,€) & 118,50\,€ (subtotal estimado) \\
 \textbf{Coste recurrente (SaaS)} & Obligatorio por suscripción & Inexistente & Nulo (Servicios \textit{Open Source}) \\
 \textbf{Soberanía de datos} & Nube cerrada de fabricante & Variable / Limitada & Total (Base local PostgreSQL) \\
 \textbf{Sonda edafológica} & Propietaria / Específica & Resistiva (Corrosión rápida) & Industrial multivariable (RS-485) \\
@@ -28,11 +28,13 @@ En la Cuadro~\ref{tab:comparativa_aplicaciones} se sintetizan las diferencias ar
 \textbf{Resiliencia local} & Variable / Opaca & Inexistente & Módem GNSS + Tarjeta microSD \\
 \textbf{Despliegue de red} & Operador comercial / Celular & Enlaces locales directos & Red privada LoRaWAN local \\ \hline
 \end{tabular}
-\caption{Comparativa entre soluciones existentes y el sistema desarrollado.}
+\caption{Comparativa entre soluciones existentes y la propuesta de este trabajo.}
 \label{tab:comparativa_aplicaciones}
 \end{table}
 
-Frente a las limitaciones descritas, este Trabajo Fin de Grado aporta una solución equilibrada sustentada en tres pilares de ingeniería: soberanía completa del dato sin recurrir a costes de suscripción, integración de instrumentación industrial robusta (Modbus RTU sobre RS-485) y una gestión energética rigurosa capaz de combinar periodos prolongados de suspensión profunda (\textit{Deep Sleep}) con mecanismos de respaldo local y resincronización horaria absoluta.
+La cifra de la propuesta corresponde al subtotal estimado para el nodo en el Cuadro~\ref{tab:costes_hardware}; no es un coste real medido ni garantiza que incluya todos los elementos de una instalación completa. Las categorías comparadas son orientativas y requieren fuentes y alcances homogéneos para una comparación de mercado concluyente.
+
+Frente a las limitaciones descritas, la propuesta de este Trabajo Fin de Grado se articula en torno a tres objetivos de diseño: soberanía del dato sin cuotas de suscripción, integración de instrumentación industrial mediante RS-485 y gestión energética con suspensión profunda, respaldo local y resincronización horaria. El grado de implementación y validación de cada objetivo se detalla en los capítulos correspondientes.
 
 
 \section{Tecnologías}
@@ -65,7 +67,7 @@ El nodo sensor exige un equilibrio entre capacidad de cálculo, interfaces de co
 
     \item \textbf{Unidad de Gestión de Potencia (PMU AXP2101):} La placa integra el circuito integrado AXP2101, controlable por bus I$^2$C. Su inclusión es determinante para desacoplar y apagar selectivamente los carriles regulados de alimentación de periféricos con consumos de reposo significativos (módem GNSS, transceptor RS-485, ranura microSD y transceptor LoRa), mitigando las corrientes parásitas y maximizando la eficiencia de la celda de litio.
 
-    \item \textbf{Módem auxiliar GNSS (SIM7080G):} Los osciladores internos del microcontrolador presentan una deriva térmica inevitable (\textit{drift}) que descalibra el reloj de tiempo real a lo largo de los días. En lugar de mantener un módulo receptor activo continuamente, el módem satelital se excita únicamente bajo demanda para resincronizar la marca temporal UTC con precisión de milisegundos.
+    \item \textbf{Módem auxiliar GNSS (SIM7080G):} El reloj del microcontrolador puede derivar con el tiempo. En lugar de mantener el receptor activo continuamente, el diseño consulta GNSS bajo demanda para corregir la hora del sistema. La precisión efectiva de las marcas temporales debe caracterizarse experimentalmente; el firmware almacena segundos enteros.
 \end{itemize}
 
 \subsection{Instrumentación edáfica y bus de comunicaciones de campo}
@@ -86,7 +88,7 @@ En el extremo receptor se requería una plataforma compacta, fiable y basada en 
     
     \item \textbf{Pila ChirpStack y Eclipse Mosquitto (MQTT):} ChirpStack Network Server constituye un núcleo de red de alto rendimiento que valida las sesiones LoRaWAN, aplica las funciones de descodificación de la carga útil binaria mediante scripts en JavaScript y publica los eventos de subida (\textit{uplink}) formateados en JSON hacia el intermediario MQTT local.
 
-    \item \textbf{Motor de base de datos PostgreSQL:} A diferencia de sistemas de ficheros planos o bases de datos no estructuradas, PostgreSQL provee integridad relacional estricta, compatibilidad con tipos de datos nativos para marcas temporales con zona horaria (\texttt{TIMESTAMPTZ}) e indexación especializada mediante árboles B (\textit{B-Tree}) sobre el identificador del nodo y la fecha de muestreo. Esto garantiza tiempos de respuesta mínimos en consultas temporales complejas realizadas desde el visualizador.
+    \item \textbf{Motor de base de datos PostgreSQL:} PostgreSQL ofrece integridad relacional, tipos para marcas temporales con zona horaria (\texttt{TIMESTAMPTZ}) e índices B-Tree que pueden facilitar consultas por identificador y fecha. La elección del esquema e índices y el cumplimiento del objetivo de latencia deben verificarse con las consultas y el volumen de datos definidos para el sistema.
 
     \item \textbf{Grafana:} Herramienta de visualización analítica que se integra de manera nativa sobre PostgreSQL mediante consultas SQL directas. Permite configurar paneles dinámicos interactivos, gráficos de series temporales para el análisis fisicoquímico, diagramas de fertilidad NPK y alertas de nivel crítico de batería del nodo sensor.
 \end{itemize}
