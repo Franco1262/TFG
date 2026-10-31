@@ -1,9 +1,10 @@
 #pragma once
 #include <cstddef>
 
-static constexpr int DEEP_SLEEP_TIME_S = 300;
+static constexpr int DEEP_SLEEP_TIME_S = 600;
 static constexpr int CRITICAL_LEVEL = 10;
-static constexpr int TIMEOUT_GPS_SECS = 60;
+static constexpr uint8_t BATTERY_UNKNOWN = 255;
+static constexpr int TIMEOUT_GPS_SECS = 300;
 static constexpr int TIMEOUT_SENSOR_SECS = 5;
 static constexpr int TIMEOUT_LORA_SECS = 15;
 static constexpr int SENSOR_READ_TIMEOUT = 2000;

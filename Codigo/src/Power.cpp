@@ -85,6 +85,7 @@ void Power::enterDeepSleep()
     gpio_reset_pin((gpio_num_t)SDMMC_CLK);
     gpio_reset_pin((gpio_num_t)SDMMC_DATA);
 
+    // TODO: Use DEEP_SLEEP_TIME_S * 1000000ULL (600 s) after testing; keep 10 s for now.
     esp_sleep_enable_timer_wakeup(10 * 1000000ULL);
     esp_deep_sleep_start();
 }

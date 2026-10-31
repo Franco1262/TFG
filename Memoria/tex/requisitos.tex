@@ -12,8 +12,8 @@ Los requisitos funcionales delimitan las operaciones y comportamientos activos d
 
 \begin{itemize}
     \item \textbf{RF-01 (Adquisición fisicoquímica multivariable):} El nodo sensor debe interrogar periódicamente la sonda edafológica para obtener de forma síncrona ocho variables del sustrato: temperatura, humedad volumétrica, conductividad eléctrica, potencial de hidrógeno (pH) y concentraciones de macronutrientes (nitrógeno, fósforo y potasio).
-    \item \textbf{RF-02 (Supervisión del suministro energético):} Antes de iniciar cada ciclo de muestreo, el firmware consulta el porcentaje de batería reportado por la PMU. Si el valor es válido y está por debajo de \texttt{CRITICAL\_LEVEL} (10\,\%), el sistema debe abortar el ciclo y volver a suspensión profunda para prevenir una descarga excesiva.
-    \item \textbf{RF-03 (Sincronización horaria absoluta):} El sistema debe contrastar periódicamente la hora de su reloj de tiempo real (RTC) frente a una fuente de referencia temporal absoluta (módem satelital GNSS) para corregir desviaciones térmicas y garantizar la coherencia cronológica de las series temporales.
+    \item \textbf{RF-02 (Supervisión del suministro energético):} Antes de iniciar cada ciclo de muestreo, el firmware consulta el porcentaje de batería reportado por la PMU. Si el valor es válido y está por debajo de \texttt{CRITICAL\_LEVEL} (10\,\%), el sistema debe abortar el ciclo y volver a suspensión profunda para prevenir una descarga excesiva. Si no se dispone de un porcentaje válido, el campo de batería se marca con el valor reservado 255, que no representa un porcentaje.
+    \item \textbf{RF-03 (Sincronización horaria absoluta):} El sistema debe contrastar periódicamente la hora de su reloj de tiempo real (RTC) frente a una fuente de referencia temporal absoluta (módem satelital GNSS) para corregir desviaciones térmicas. La sincronización se intenta en el arranque en frío y cada 24 horas desde el último éxito; tras un fallo, los intentos se espacian al menos 600\,s. El fallo no debe impedir el envío ni el registro de muestras: se utiliza la marca temporal del reloj del ESP32, conservando la hora previa si existe. Sin una sincronización válida no se garantiza que esa marca corresponda a UTC real.
     \item \textbf{RF-04 (Almacenamiento transitorio de bajo consumo):} Las muestras adquiridas deben consolidarse inicialmente en una estructura circular retenida en la memoria RTC Slow RAM, permitiendo su acumulación entre ciclos de suspensión sin someter a desgaste medios de almacenamiento no volátiles.
     \item \textbf{RF-05 (Transmisión inalámbrica agrupada por lotes):} El dispositivo debe evaluar dinámicamente si el volumen de muestras acumuladas justifica el encendido del módulo de radio LoRa, procediendo a su emisión conjunta (\textit{batching}) en tramas binarias compactas que optimicen el tiempo en el aire.
     \item \textbf{RF-06 (Histórico en tarjeta microSD y gestión acotada del búfer):} El firmware debe registrar una sola vez en un archivo de auditoría por fecha, en formato JSON Lines (\texttt{.jsonl}), cada lote transmitido correctamente o que haya agotado sus dos intentos de envío, generando una entrada por muestra. Tras el primer fallo, el lote debe conservarse en el búfer RTC y marcarse como pendiente de reintento mediante un estado retenido durante el \textit{Deep Sleep}; una referencia estable y el número de muestras deben identificarlo para no descartar muestras nuevas ni duplicar entradas en el histórico. Tras el éxito o el segundo fallo, solo se descartarán las muestras de ese lote. Si falla la escritura en SD, se notificará explícitamente el error y se descartará igualmente el lote para mantener acotado el búfer, aceptando la posible pérdida del registro. La SD es un histórico, no una cola de reenvío.
@@ -40,6 +40,7 @@ A partir de los requisitos establecidos, se derivan las especificaciones técnic
 
 \subsection{Especificaciones del nodo sensor y subsistemas electrónicos}
 \begin{itemize}
+    \item \textbf{Temporización del ciclo:} Intervalo nominal de suspensión profunda de 600\,s (10 minutos), configurado mediante \texttt{DEEP\_SLEEP\_TIME\_S}. El periodo entre adquisiciones incluye además el tiempo activo del ciclo.
     \item \textbf{Unidad de control y procesamiento (MCU):} Placa LilyGO T-SIM7080G-S3 gobernada por el SoC Espressif ESP32-S3 (arquitectura Xtensa LX7 de doble núcleo a 240\,MHz). Integra 16\,MB de memoria Flash Quad-SPI, 8\,MB de PSRAM externa conectada por bus SPI, 512\,KB de SRAM interna y 8\,KB de RTC Slow RAM para retención de variables estáticas durante el estado de suspensión profunda (\textit{Deep Sleep}).
     
     \item \textbf{Unidad de gestión de potencia (PMU AXP2101):} Controlable mediante un bus dedicado I$^2$C (\texttt{SDA = GPIO 10}, \texttt{SCL = GPIO 11}) con línea de interrupción hardware (\texttt{GPIO 21}). Permite conmutar dinámicamente los carriles de regulación LDO y DC-DC (aislando el transceptor LoRa, la tarjeta de memoria y el bus RS-485 durante la suspensión), además de supervisar el nivel porcentual y la tensión de la celda de litio mediante su convertidor analógico-digital (ADC) integrado.
@@ -64,7 +65,7 @@ A partir de los requisitos establecidos, se derivan las especificaciones técnic
     \item \textbf{Activación y seguridad:} Procedimiento de activación por el aire (\textit{Over-The-Air Activation}, OTAA) basado en las claves raíz \texttt{DevEUI}, \texttt{AppEUI/JoinEUI} y \texttt{AppKey}. Derivación y preservación en memoria RTC de las claves de sesión \texttt{NwkSKey} y \texttt{AppSKey}, así como del contador ascendente de tramas (\texttt{FCntUp}).
     \item \textbf{Estructura binaria de muestra (\texttt{struct Data}):} Formato binario fijo y empaquetado (\texttt{\_\_attribute\_\_((packed))}) de 19 bytes en ordenación de bytes de menor peso primero (\textit{Little-Endian}):
     \begin{itemize}
-        \item \texttt{timestamp} (4 bytes, \texttt{uint32\_t}): Marca temporal Unix absoluta UTC en segundos.
+        \item \texttt{timestamp} (4 bytes, \texttt{uint32\_t}): Marca temporal en segundos del reloj del ESP32. Representa tiempo Unix UTC tras una sincronización válida; en ausencia de esta, se conserva su valor aunque la fecha pueda ser incorrecta.
         \item \texttt{temperature} (2 bytes, \texttt{int16\_t}): Temperatura en grados centígrados (resolución $0{,}01$\,$^\circ$C).
         \item \texttt{humidity} (2 bytes, \texttt{uint16\_t}): Humedad volumétrica porcentual (resolución $0{,}01$\,\%).
         \item \texttt{conductivity} (2 bytes, \texttt{uint16\_t}): Conductividad eléctrica en $\mu$S/cm.
@@ -72,7 +73,7 @@ A partir de los requisitos establecidos, se derivan las especificaciones técnic
         \item \texttt{nitrogen} (2 bytes, \texttt{uint16\_t}): Concentración de nitrógeno en mg/kg.
         \item \texttt{phosphorus} (2 bytes, \texttt{uint16\_t}): Concentración de fósforo en mg/kg.
         \item \texttt{potassium} (2 bytes, \texttt{uint16\_t}): Concentración de potasio en mg/kg.
-        \item \texttt{battery} (1 byte, \texttt{uint8\_t}): Nivel de carga residual porcentual ($0$\,--\,$100$\,\%).
+        \item \texttt{battery} (1 byte, \texttt{uint8\_t}): Nivel de carga residual porcentual ($0$\,--\,$100$\,\%); 255 indica porcentaje desconocido.
     \end{itemize}
 \end{itemize}
 

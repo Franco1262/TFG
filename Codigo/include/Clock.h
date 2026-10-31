@@ -43,18 +43,18 @@ namespace Clock
 
     /**
      * @brief Determines if the system clock needs a new synchronization.
-     * * Compares the current system time with the last successful synchronization 
-     * timestamp. Returns true if more than 24 hours (SECONDS_DAY) have passed.
-     * * @return true  If a synchronization is required.
-     * @return false If the current system time is still considered accurate.
+    * * A successful synchronization is due again after 24 hours.
+    * Failed attempts are retried after DEEP_SLEEP_TIME_S (600 seconds).
+    * * @return true If synchronization is due and the retry interval has elapsed.
+    * @return false If neither daily synchronization nor a retry is due.
      */
     bool needsDailySync();
 
     /**
      * @brief Retrieves the current system time from the internal RTC.
      * * This is a fast wrapper for the standard time(NULL) function. 
-     * It should be used after a successful syncWithGPS() call.
-     * * @return time_t Current system Unix timestamp (UTC).
+    * It remains usable after a failed sync, but may be unsynchronized.
+    * * @return time_t ESP32 system timestamp; valid UTC only after synchronization.
      */
     time_t getTime();
     

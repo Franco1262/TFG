@@ -43,12 +43,16 @@ void setup()
     initRtcBuffer();
 
     if(Power::isColdBoot() || Clock::needsDailySync())
-     {
-         DEBUG_PRINTLN("Trying to fix GPS, this will take 1-5mins");
-         Clock::syncWithGPS();
+    {
+        DEBUG_PRINTF("Trying to fix GPS, timeout: %d s\n", TIMEOUT_GPS_SECS);
+        if (!Clock::syncWithGPS())
+            DEBUG_PRINTLN("GNSS sync failed; using the ESP32 clock");
     }
 
-    data.battery = battery;
+    if (battery < 0 || battery > 100)
+        DEBUG_PRINTLN("Battery percentage unavailable");
+
+    data.battery = (battery >= 0 && battery <= 100) ? static_cast<uint8_t>(battery) : BATTERY_UNKNOWN;
     data.timestamp = Clock::getTime();
 
     Sensor::turnOn();

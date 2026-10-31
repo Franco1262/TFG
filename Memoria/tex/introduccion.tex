@@ -21,7 +21,7 @@ de batería integrados en la placa LilyGO T-SIM7080G, gobernados por la unidad d
 de potencia (PMU AXP2101). A nivel de software, el firmware opera bajo un ciclo de vida 
 periódico regido por la función \texttt{setup()}, prescindiendo del bucle continuo 
 \texttt{loop()} para alternar ráfagas breves de procesamiento con periodos prolongados 
-de suspensión profunda (\textit{Deep Sleep}). En cada despertar, el PMU conmuta de 
+de suspensión profunda (\textit{Deep Sleep}). El intervalo previsto de suspensión es de 600\,s (10 minutos), al que se suma el tiempo activo del ciclo. En cada despertar, el PMU conmuta de
 forma selectiva los carriles de alimentación de los subsistemas periféricos. El nodo 
 evalúa inicialmente el porcentaje de batería para abortar el ciclo si se sitúa bajo un
 umbral crítico de protección; a continuación, excita el bus industrial RS-485 para 

@@ -26,7 +26,8 @@ namespace Power
     /**
      * @brief Powers down peripherals and puts the ESP32 into Deep Sleep mode.
      * * Disables the modem and SD circuitry before entering sleep.
-     * The wake-up trigger is set according to the TIME_TO_SLEEP_S constant.
+    * The operating interval is DEEP_SLEEP_TIME_S (600 seconds).
+    * Power.cpp temporarily uses 10 seconds for testing, with a TODO to restore it.
      * This function is terminal; the CPU will reset upon wake-up.
      */
     void enterDeepSleep();
